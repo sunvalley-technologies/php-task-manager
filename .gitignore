@@ -1,0 +1,7 @@
+/coverage
+/vendor/
+/.idea
+/composer.phar
+.phpunit
+/phpunit.xml
+/composer.lock
