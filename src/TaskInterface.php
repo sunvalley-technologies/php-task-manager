@@ -6,7 +6,7 @@ interface TaskInterface
 {
 
     /**
-     * Get ID of this task. This is usually a UUID.
+     * Get ID of this task. This is usually a UUID This ID should be unique for each task instance.
      *
      * @return string
      */

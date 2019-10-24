@@ -5,8 +5,10 @@ namespace SunValley\TaskManager;
 use React\EventLoop\LoopInterface;
 use React\Promise\PromiseInterface;
 use WyriHaximus\React\ChildProcess\Messenger\ChildInterface;
+use WyriHaximus\React\ChildProcess\Messenger\Messages\Factory;
 use WyriHaximus\React\ChildProcess\Messenger\Messages\Payload;
 use WyriHaximus\React\ChildProcess\Messenger\Messenger;
+use function React\Promise\reject;
 use function React\Promise\resolve;
 
 class Worker implements ChildInterface
@@ -30,6 +32,7 @@ class Worker implements ChildInterface
     protected function __construct(Messenger $messenger, LoopInterface $loop)
     {
         $this->loop = $loop;
+        $this->setupRpc($messenger);
     }
 
     /**
@@ -41,23 +44,24 @@ class Worker implements ChildInterface
     {
         $genFn = function (callable $callback) {
             return function (Payload $payload, Messenger $messenger) use ($callback) {
-                $retval         = call_user_func($callback, $payload);
-                $retval['uuid'] = $payload['uuid'];
-                $retval         = resolve($retval);
-                
+                $retval = call_user_func($callback, $payload, $messenger);
+                if (!$retval instanceof PromiseInterface) {
+                    $retval = resolve($retval);
+                }
+
                 return $retval;
             };
         };
 
-        $messenger->registerRpc('submitTask', $genFn([$this, 'submitTask']));
+        $messenger->registerRpc('submit-task', $genFn([$this, 'submitTask']));
     }
 
-    protected function submitTask(Payload $payload)
+    protected function submitTask(Payload $payload, Messenger $messenger)
     {
         $task = $payload['task'];
         $task = unserialize($task);
         if (!$task instanceof TaskInterface) {
-            return ['error' => 'Internal Error! Task cannot be decoded!'];
+            return reject(['error' => 'Internal Error! Task cannot be decoded!']);
         }
 
         if ($task instanceof LoopAwareInterface) {
@@ -65,9 +69,16 @@ class Worker implements ChildInterface
         }
 
         $progressReporter = new ProgressReporter($task);
-
+        foreach (['done', 'failed', 'change'] as $event) {
+            $progressReporter->on(
+                $event,
+                function (ProgressReporter $reporter) use ($messenger) {
+                    $messenger->rpc(Factory::rpc('task-report', ['report' => serialize($reporter)]));
+                }
+            );
+        }
         $task->run($progressReporter);
 
-        return ['success' => true];
+        return [];
     }
 }
