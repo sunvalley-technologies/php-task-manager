@@ -2,6 +2,11 @@
 
 namespace SunValley\TaskManager;
 
+/**
+ * Implementing classes should be serializable.
+ *
+ * @package SunValley\TaskManager
+ */
 interface TaskInterface
 {
 

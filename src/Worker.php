@@ -16,6 +16,9 @@ use function React\Promise\resolve;
 class Worker extends EventEmitter implements ChildInterface
 {
 
+    /** @var int */
+    private $runningTasks = 0;
+
     /**
      * @inheritDoc
      * @return static
@@ -68,7 +71,7 @@ class Worker extends EventEmitter implements ChildInterface
         if (!$task instanceof TaskInterface) {
             return reject(['error' => 'Internal Error! Task cannot be decoded!']);
         }
-
+        
         if ($task instanceof LoopAwareInterface) {
             $task->setLoop($this->loop);
         }
@@ -82,12 +85,25 @@ class Worker extends EventEmitter implements ChildInterface
                 function (ProgressReporter $reporter) use ($messenger) {
                     $reporter = clone $reporter;
                     $reporter->removeAllListeners();
-                    
+
                     $messenger->rpc(Factory::rpc('task-report', ['report' => serialize($reporter)]));
                 }
             );
         }
+
+        $events = ['done', 'failed'];
+        foreach ($events as $event) {
+            $progressReporter->on(
+                $event,
+                function () {
+                    $this->runningTasks--;
+                }
+            );
+        }
+
+        $this->runningTasks++;
         $task->run($progressReporter);
+
 
         return [];
     }

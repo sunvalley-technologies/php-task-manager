@@ -10,6 +10,9 @@ class ProgressReporter extends EventEmitter
     /** @var string */
     private $message = '';
 
+    /** @var string */
+    private $error = '';
+
     /** @var float */
     private $completion = 0.0;
 
@@ -64,6 +67,16 @@ class ProgressReporter extends EventEmitter
         $this->emitChangeEvent();
     }
 
+    /**
+     * Get error message. This is an internal message like an exception.
+     * 
+     * @return string
+     */
+    public function getError(): string
+    {
+        return $this->error;
+    }
+    
     /**
      * Set completion indicator.  This is used with completion target to indicate a percentage of completion.
      *
@@ -129,12 +142,17 @@ class ProgressReporter extends EventEmitter
     /**
      * Indicate that a task is finished with error.  This method should only be called once and if this method is
      * called, finishTask should not be called after. Does not change completion.
+     *
+     * @param string|null $error   If given, error message is set to this
+     * @param string|null $message If given, message is set to this
      */
-    public function failTask()
+    public function failTask(string $error = null, string $message = null)
     {
         $previousStatus = $this->status;
         $this->status   = TaskStatus::FAILED();
         $this->result   = null;
+        $this->error    = $error ?? $this->error;
+        $this->message  = $message ?? $this->message;
 
         if ($previousStatus === TaskStatus::PROCESSING()) {
             $this->emit('failed', [$this]);

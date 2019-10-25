@@ -5,6 +5,12 @@ namespace SunValley\TaskManager;
 use SunValley\TaskManager\Exception\TaskOptionValidationException;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
+/**
+ * Class AbstractTask makes an easy abstraction for implementing a task and also makes sure that the class is
+ * serializable
+ *
+ * @package SunValley\TaskManager
+ */
 abstract class AbstractTask implements TaskInterface
 {
 
@@ -13,6 +19,9 @@ abstract class AbstractTask implements TaskInterface
 
     /** @var array */
     protected $options;
+
+    /** @var OptionsResolver */
+    protected $optionsResolver;
 
     /**
      * AbstractTask constructor.
@@ -39,6 +48,8 @@ abstract class AbstractTask implements TaskInterface
     {
         try {
             $this->options = $this->getOptionsResolver()->resolve($options);
+
+            serialize($this);
         } catch (\Exception $e) {
             throw new TaskOptionValidationException($e->getMessage(), $e->getCode(), $e);
         }
@@ -51,9 +62,31 @@ abstract class AbstractTask implements TaskInterface
     }
 
     /**
+     * Returns options resolver
+     *
+     * @return OptionsResolver
+     */
+    public function getOptionsResolver(): OptionsResolver
+    {
+        if ($this->optionsResolver === null) {
+            $this->optionsResolver = $this->buildOptionsResolver();
+        }
+
+        return $this->optionsResolver;
+    }
+
+    /**
      * Return options resolver to limit arguments
      *
      * @return OptionsResolver
      */
-    abstract function getOptionsResolver(): OptionsResolver;
+    abstract function buildOptionsResolver(): OptionsResolver;
+
+    public function __sleep()
+    {
+        return [
+            'id',
+            'options',
+        ];
+    }
 }

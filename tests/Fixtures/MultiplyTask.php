@@ -10,7 +10,7 @@ class MultiplyTask extends AbstractTask
 {
 
     /** @inheritDoc */
-    function getOptionsResolver(): OptionsResolver
+    function buildOptionsResolver(): OptionsResolver
     {
         $resolver = new OptionsResolver();
         $resolver->setRequired(['number1', 'number2']);
