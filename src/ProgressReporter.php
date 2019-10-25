@@ -44,7 +44,7 @@ class ProgressReporter extends EventEmitter
 
     /**
      * Get progress message for this task
-     * 
+     *
      * @return string
      */
     public function getMessage(): string
@@ -54,7 +54,7 @@ class ProgressReporter extends EventEmitter
 
     /**
      * Set progress message for this task
-     * 
+     *
      * @param string $message
      */
     public function setMessage(string $message): void
@@ -110,15 +110,16 @@ class ProgressReporter extends EventEmitter
 
     /**
      * Indicate that a task is finished with given result. This method should only be called once and if this method is
-     * called, failTask should not be called after.
+     * called, failTask should not be called after. Sets completion as completion target to indicate 100% completion.
      *
      * @param null $result
      */
     public function finishTask($result = null)
     {
-        $previousStatus = $this->status;
-        $this->status   = TaskStatus::COMPLETED();
-        $this->result   = $result;
+        $previousStatus   = $this->status;
+        $this->status     = TaskStatus::COMPLETED();
+        $this->result     = $result;
+        $this->completion = $this->completionTarget;
 
         if ($previousStatus === TaskStatus::PROCESSING()) {
             $this->emit('done', [$this]);
@@ -127,7 +128,7 @@ class ProgressReporter extends EventEmitter
 
     /**
      * Indicate that a task is finished with error.  This method should only be called once and if this method is
-     * called, finishTask should not be called after.
+     * called, finishTask should not be called after. Does not change completion.
      */
     public function failTask()
     {

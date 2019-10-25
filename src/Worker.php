@@ -2,8 +2,10 @@
 
 namespace SunValley\TaskManager;
 
+use Evenement\EventEmitter;
 use React\EventLoop\LoopInterface;
 use React\Promise\PromiseInterface;
+use React\Stream\Util;
 use WyriHaximus\React\ChildProcess\Messenger\ChildInterface;
 use WyriHaximus\React\ChildProcess\Messenger\Messages\Factory;
 use WyriHaximus\React\ChildProcess\Messenger\Messages\Payload;
@@ -11,10 +13,13 @@ use WyriHaximus\React\ChildProcess\Messenger\Messenger;
 use function React\Promise\reject;
 use function React\Promise\resolve;
 
-class Worker implements ChildInterface
+class Worker extends EventEmitter implements ChildInterface
 {
 
-    /** @inheritDoc */
+    /**
+     * @inheritDoc
+     * @return static
+     */
     public static function create(Messenger $messenger, LoopInterface $loop)
     {
         return new static($messenger, $loop);
@@ -69,10 +74,15 @@ class Worker implements ChildInterface
         }
 
         $progressReporter = new ProgressReporter($task);
-        foreach (['done', 'failed', 'change'] as $event) {
+        $events           = ['done', 'failed', 'change'];
+        Util::forwardEvents($progressReporter, $this, $events);
+        foreach ($events as $event) {
             $progressReporter->on(
                 $event,
                 function (ProgressReporter $reporter) use ($messenger) {
+                    $reporter = clone $reporter;
+                    $reporter->removeAllListeners();
+                    
                     $messenger->rpc(Factory::rpc('task-report', ['report' => serialize($reporter)]));
                 }
             );

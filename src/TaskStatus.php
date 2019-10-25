@@ -20,16 +20,16 @@ class TaskStatus extends AbstractEnumeration
     /**
      * Indicates a task is processing
      */
-    private const PROCESSING = 'Processing';
+    const PROCESSING = 'Processing';
 
     /**
      * Indicates a task is failed
      */
-    private const FAILED = 'Failed';
+    const FAILED = 'Failed';
 
     /**
      * Indicates a task is completed
      */
-    private const COMPLETED = 'Completed';
+    const COMPLETED = 'Completed';
     
 }

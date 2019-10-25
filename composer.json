@@ -16,9 +16,13 @@
     "eloquent/enumeration": "^5.0|^6.0",
     "evenement/evenement": "^3.0"
   },
+  "require-dev": {
+    "phpunit/phpunit": "~6.0|~7.0"
+  },
   "autoload": {
     "psr-4": {
-      "SunValley\\TaskManager\\": "src/"
+      "SunValley\\TaskManager\\": "src/",
+      "SunValley\\TaskManager\\Tests\\": "tests/"
     }
   }
 }
