@@ -10,6 +10,7 @@ use WyriHaximus\React\ChildProcess\Messenger\Messages\Factory as RpcFactory;
 use WyriHaximus\React\ChildProcess\Messenger\Messages\Payload;
 use WyriHaximus\React\ChildProcess\Messenger\Messenger;
 use WyriHaximus\React\ChildProcess\Pool\Factory\Flexible as FlexiblePoolFactory;
+use WyriHaximus\React\ChildProcess\Pool\Options;
 use WyriHaximus\React\ChildProcess\Pool\PoolInterface;
 use WyriHaximus\React\ChildProcess\Pool\Worker as PoolWorker;
 use function React\Promise\resolve;
@@ -41,24 +42,29 @@ class TaskManager extends EventEmitter
     /** @var ProgressReporter[] */
     protected $watchingTasks = [];
 
+    /** @var Configuration */
+    protected $configuration;
+
     /**
      * TaskManager constructor.
      *
      * @param LoopInterface      $loop
      * @param TaskQueueInterface $queue
+     * @param Configuration      $configuration
      */
-    public function __construct(LoopInterface $loop, TaskQueueInterface $queue)
+    public function __construct(LoopInterface $loop, TaskQueueInterface $queue, Configuration $configuration)
     {
-        $this->loop  = $loop;
-        $this->queue = $queue;
+        $this->loop          = $loop;
+        $this->queue         = $queue;
+        $this->configuration = $configuration;
         $this->queue->onAvailableTask([$this, 'checkQueue']);
 
         FlexiblePoolFactory::createFromClass(
             Worker::class,
             $loop,
             [
-                'min_size' => 0,
-                'max_size' => 50,
+                Options::MIN_SIZE => $configuration->getMinProcesses(),
+                Options::MAX_SIZE => $configuration->getMaxProcesses(),
             ]
         )->then([$this, 'initializePool']);
     }
