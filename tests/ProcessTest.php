@@ -9,14 +9,14 @@ use React\EventLoop\Factory as LoopFactory;
 use React\Socket\ConnectionInterface;
 use SunValley\TaskManager\ProgressReporter;
 use SunValley\TaskManager\TaskInterface;
-use SunValley\TaskManager\Worker as Worker;
+use SunValley\TaskManager\Process;
 use WyriHaximus\React\ChildProcess\Messenger\Messages\Payload;
 use WyriHaximus\React\ChildProcess\Messenger\Messenger;
 
-class WorkerTest extends TestCase
+class ProcessTest extends TestCase
 {
 
-    public function testWorker()
+    public function testProcess()
     {
         $connection = $this->prophesize(ConnectionInterface::class);
         /** @var MethodProphecy $method */
@@ -25,7 +25,7 @@ class WorkerTest extends TestCase
         $messenger   = new Messenger($connection->reveal());
         $loop        = LoopFactory::create();
         $foundResult = null;
-        Worker::create($messenger, $loop)->on(
+        Process::create($messenger, $loop)->on(
             'done',
             function (ProgressReporter $reporter) use (&$foundResult, $loop) {
                 $foundResult = $reporter->getResult();
@@ -41,7 +41,7 @@ class WorkerTest extends TestCase
         $method->shouldHaveBeenCalledTimes(3);
     }
 
-    public function testAsyncWorker()
+    public function testAsyncTaskProcess()
     {
         $connection = $this->prophesize(ConnectionInterface::class);
         /** @var MethodProphecy $method */
@@ -57,7 +57,7 @@ class WorkerTest extends TestCase
         ];
         $foundResults = [];
 
-        Worker::create($messenger, $loop)->on(
+        Process::create($messenger, $loop)->on(
             'done',
             function (ProgressReporter $reporter) use (&$foundResults, $tasks, $loop) {
                 $foundResults[$reporter->getTask()->getId()] = $reporter->getResult();

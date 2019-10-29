@@ -5,6 +5,7 @@ namespace SunValley\TaskManager;
 use React\EventLoop\LoopInterface;
 use React\Promise\ExtendedPromiseInterface;
 
+/** Implementations should be async */
 interface TaskQueueInterface
 {
 
@@ -28,10 +29,11 @@ interface TaskQueueInterface
     /**
      * Gets a task from this queue. This method should not block.
      *
+     * @param bool $asyncOnly If given TRUE, this dequeue should only return an async task.
+     *
      * @return TaskInterface|null
-     * @throws Exception\TaskQueueException
      */
-    public function dequeue(): ?TaskInterface;
+    public function dequeue(bool $asyncOnly = false): ?TaskInterface;
 
     /**
      * Cancel the given task. This does not stop the execution of the task if it is running.
@@ -75,4 +77,11 @@ interface TaskQueueInterface
      * @param callable $callback
      */
     public function onAvailableTask(callable $callback): void;
+
+    /**
+     * Returns the count of tasks in queue
+     * 
+     * @return int
+     */
+    public function count(): int;
 }

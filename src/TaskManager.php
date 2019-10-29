@@ -4,16 +4,14 @@ namespace SunValley\TaskManager;
 
 use Evenement\EventEmitter;
 use React\EventLoop\LoopInterface;
+use React\EventLoop\TimerInterface;
 use React\Promise\Deferred;
 use React\Promise\ExtendedPromiseInterface;
-use WyriHaximus\React\ChildProcess\Messenger\Messages\Factory as RpcFactory;
-use WyriHaximus\React\ChildProcess\Messenger\Messages\Payload;
-use WyriHaximus\React\ChildProcess\Messenger\Messenger;
-use WyriHaximus\React\ChildProcess\Pool\Factory\Flexible as FlexiblePoolFactory;
-use WyriHaximus\React\ChildProcess\Pool\Options;
+use WyriHaximus\FileDescriptors\Factory as FDFactory;
+use WyriHaximus\React\ChildProcess\Pool\Launcher\ClassName;
+use SunValley\TaskManager\PoolOptions as Options;
 use WyriHaximus\React\ChildProcess\Pool\PoolInterface;
-use WyriHaximus\React\ChildProcess\Pool\Worker as PoolWorker;
-use function React\Promise\resolve;
+use WyriHaximus\React\ChildProcess\Pool\ProcessCollection\Single;
 
 /**
  * Class TaskManager
@@ -36,14 +34,17 @@ class TaskManager extends EventEmitter
     /** @var TaskQueueInterface */
     protected $queue;
 
-    /** @var PoolInterface */
+    /** @var Pool */
     protected $pool;
-
-    /** @var ProgressReporter[] */
-    protected $watchingTasks = [];
 
     /** @var Configuration */
     protected $configuration;
+
+    /** @var TimerInterface */
+    protected $queueTimer;
+
+    /** @var bool */
+    protected $idleQueueTimer = true;
 
     /**
      * TaskManager constructor.
@@ -59,59 +60,59 @@ class TaskManager extends EventEmitter
         $this->configuration = $configuration;
         $this->queue->onAvailableTask([$this, 'checkQueue']);
 
-        FlexiblePoolFactory::createFromClass(
-            Worker::class,
-            $loop,
-            [
-                Options::MIN_SIZE => $configuration->getMinProcesses(),
-                Options::MAX_SIZE => $configuration->getMaxProcesses(),
-            ]
-        )->then([$this, 'initializePool']);
-    }
+        // Setup process collection
+        $processCollection = new Single(new ClassName(Process::class));
 
-    protected function initializePool(PoolInterface $pool)
-    {
-        $this->pool = $pool;
+        // Setup options
+        /** @noinspection PhpUnhandledExceptionInspection */
+        $options = [
+            Options::MIN_SIZE             => $configuration->getMinProcesses(),
+            Options::MAX_SIZE             => $configuration->getMaxProcesses(),
+            Options::TTL                  => $configuration->getTtl(),
+            Options::FD_LISTER            => FDFactory::create(),
+            Options::MAX_JOBS_PER_PROCESS => $configuration->getMaxJobsPerProcess(),
+        ];
+
+        $this->pool = new Pool($processCollection, $loop, $options);
         $this->loop->addPeriodicTimer(1, [$this, 'checkQueue']);
-
-        // hack worker on other implementation
-        $workerReflection  = new \ReflectionClass(PoolWorker::class);
-        $messengerProperty = $workerReflection->getProperty('messenger');
-        $pool->on(
-            'worker',
-            // always expect the concrete definition for this hack, so it bails out in case library implementation changes
-            function (PoolWorker $worker) use ($messengerProperty) {
-                /** @var Messenger $messenger */
-                $messenger = $messengerProperty->getValue($worker);
-
-                // register additional RPCs
-                $this->registerRpc($messenger);
-            }
-        );
     }
 
-    protected function registerRpc(Messenger $messenger)
+    protected function setIdleQueueTimer()
     {
-        $messenger->registerRpc('task-report', [$this, 'handleProgressReport']);
-    }
-
-    protected function handleProgressReport(Payload $payload)
-    {
-        $report = $payload['report'];
-        $report = unserialize($report);
-        if ($report instanceof ProgressReporter) {
-            $task = $report->getTask();
-            if (isset($this->watchingTasks[$task->getId()])) {
-                $this->watchingTasks[$task->getId()]->merge($report);
-            }
+        if ($this->idleQueueTimer && $this->queueTimer !== null) {
+            return;
         }
 
-        return resolve([]);
+        $this->setQueueTimer(1);
+    }
+
+    protected function setBusyQueueTimer()
+    {
+        if (!$this->idleQueueTimer && $this->queueTimer !== null) {
+            return;
+        }
+
+        $this->setQueueTimer(.1);
+    }
+
+    protected function setQueueTimer(float $interval)
+    {
+        if ($this->queueTimer !== null) {
+            $this->loop->cancelTimer($this->queueTimer);
+        }
+
+        $this->queueTimer = $this->loop->addPeriodicTimer($interval, [$this, 'checkQueue']);
     }
 
     protected function checkQueue()
     {
-        while (($task = $this->queue->dequeue()) !== null) {
+        if (!$this->pool->canProcessAsyncTask() && $this->queue->count()) {
+            $this->setBusyQueueTimer();
+
+            return;
+        }
+
+        while (($task = $this->queue->dequeue($this->pool->canProcessSyncTask() === false)) !== null) {
             $this->handleTask($task);
         }
     }
@@ -161,16 +162,14 @@ class TaskManager extends EventEmitter
             }
         );
 
-
-        $this->pool->rpc(RpcFactory::rpc('submit-task', ['task' => serialize($task)]))->otherwise(
-            function ($error) use ($task) {
-                // TODO : Report internal exception
-                $this->queue->refund($task);
-                unset($this->watchingTasks[$task->getId()]); // this is just a refund
-            }
-        );
-
-        $this->watchingTasks[$task->getId()] = $progressReporter;
+        $this->pool->submitTask($progressReporter)
+                   ->otherwise(
+                       function ($error) use ($task) {
+                           // TODO : Report internal exception
+                           $this->queue->refund($task);
+                           $this->clearTask($task);
+                       }
+                   );
     }
 
     protected function clearTask(TaskInterface $task)
@@ -178,7 +177,6 @@ class TaskManager extends EventEmitter
         $this->removeAllListeners('task-completed-' . $task->getId());
         $this->removeAllListeners('task-failed-' . $task->getId());
         $this->removeAllListeners('task-progress-' . $task->getId());
-        unset($this->watchingTasks[$task->getId()]);
     }
 
 

@@ -13,7 +13,7 @@ use WyriHaximus\React\ChildProcess\Messenger\Messenger;
 use function React\Promise\reject;
 use function React\Promise\resolve;
 
-class Worker extends EventEmitter implements ChildInterface
+class Process extends EventEmitter implements ChildInterface
 {
 
     /** @var int */

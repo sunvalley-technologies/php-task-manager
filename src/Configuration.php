@@ -6,13 +6,19 @@ class Configuration
 {
 
     /** @var int */
-    private $minProcesses = 0;
+    private $minProcesses = 1;
 
     /** @var int */
     private $maxProcesses = 10;
 
     /** @var int */
     private $maxRunningTasks = 50;
+
+    /** @var int */
+    private $ttl = 60;
+
+    /** @var int */
+    private $maxJobsPerProcess = 10;
 
     /**
      * Get maximum processes that will be spawned in pool. Defaults to 10.
@@ -71,5 +77,45 @@ class Configuration
     public function setMaxRunningTasks(int $maxRunningTasks): void
     {
         $this->maxRunningTasks = $maxRunningTasks;
+    }
+
+    /**
+     * Get time to live in seconds for an IDLE process
+     *
+     * @return int
+     */
+    public function getTtl(): int
+    {
+        return $this->ttl;
+    }
+
+    /**
+     * Set time to live in seconds for an IDLE process
+     *
+     * @param int $ttl
+     */
+    public function setTtl(int $ttl): void
+    {
+        $this->ttl = $ttl;
+    }
+
+    /**
+     * Get maximum jobs a process can handle
+     *
+     * @return int
+     */
+    public function getMaxJobsPerProcess(): int
+    {
+        return $this->maxJobsPerProcess;
+    }
+
+    /**
+     * Set maximum jobs a process can handle
+     *
+     * @param int $maxJobsPerProcess
+     */
+    public function setMaxJobsPerProcess(int $maxJobsPerProcess): void
+    {
+        $this->maxJobsPerProcess = $maxJobsPerProcess;
     }
 }
