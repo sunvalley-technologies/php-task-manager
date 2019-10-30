@@ -34,6 +34,9 @@ class ProgressReporter extends EventEmitter
     /** @var bool */
     private $preventChangeEvent = false;
 
+    /** @var bool */
+    private $merging = false;
+
     /**
      * ProgressReporter constructor.
      *
@@ -69,14 +72,14 @@ class ProgressReporter extends EventEmitter
 
     /**
      * Get error message. This is an internal message like an exception.
-     * 
+     *
      * @return string
      */
     public function getError(): string
     {
         return $this->error;
     }
-    
+
     /**
      * Set completion indicator.  This is used with completion target to indicate a percentage of completion.
      *
@@ -133,6 +136,7 @@ class ProgressReporter extends EventEmitter
         $this->status     = TaskStatus::COMPLETED();
         $this->result     = $result;
         $this->completion = $this->completionTarget;
+        !$this->merging && $this->counter++;
 
         if ($previousStatus === TaskStatus::PROCESSING()) {
             $this->emit('done', [$this]);
@@ -153,6 +157,7 @@ class ProgressReporter extends EventEmitter
         $this->result   = null;
         $this->error    = $error ?? $this->error;
         $this->message  = $message ?? $this->message;
+        !$this->merging && $this->counter++;
 
         if ($previousStatus === TaskStatus::PROCESSING()) {
             $this->emit('failed', [$this]);
@@ -205,7 +210,7 @@ class ProgressReporter extends EventEmitter
             return;
         }
 
-        $this->counter++;
+        !$this->merging && $this->counter++;
         $this->status === TaskStatus::PROCESSING() && $this->emit('change', [$this]);
     }
 
@@ -226,20 +231,22 @@ class ProgressReporter extends EventEmitter
         }
 
         if ($reporter->counter > $this->counter) {
+            $this->merging            = true;
+            $this->counter            = $reporter->counter;
             $this->preventChangeEvent = true;
             $this->setCompletion($reporter->getCompletion());
             $this->setCompletionTarget($reporter->getCompletionTarget());
             $this->setMessage($reporter->getMessage());
             $this->preventChangeEvent = false;
-            $this->status             = $reporter->status;
             $this->result             = $reporter->getResult();
-            if ($this->status === TaskStatus::PROCESSING()) {
+            if ($reporter->status == TaskStatus::PROCESSING()) {
                 $this->emitChangeEvent();
-            } elseif ($this->status === TaskStatus::FAILED()) {
-                $this->failTask();
-            } elseif ($this->status === TaskStatus::COMPLETED()) {
-                $this->finishTask();
+            } elseif ($reporter->status == TaskStatus::FAILED()) {
+                $this->failTask($reporter->error, $this->message);
+            } elseif ($reporter->status == TaskStatus::COMPLETED()) {
+                $this->finishTask($this->result);
             }
+            $this->merging = false;
         }
     }
 

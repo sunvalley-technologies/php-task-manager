@@ -13,5 +13,5 @@ use WyriHaximus\React\ChildProcess\Pool\Options;
  */
 class PoolOptions extends Options
 {
-    const MAX_JOBS_PER_PROCESS = 10;
+    const MAX_JOBS_PER_PROCESS = 'max_jobs_per_process';
 }

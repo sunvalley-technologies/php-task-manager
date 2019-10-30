@@ -24,13 +24,16 @@ class PoolWorker extends Worker
         Options::MAX_JOBS_PER_PROCESS => 10,
     ];
 
-    protected $terminateTimer;
-
     public function __construct(Messenger $messenger)
     {
         parent::__construct($messenger);
-
-        $messenger->registerRpc('task-report', [$this, 'handleProgressReport']);
+        
+        $messenger->registerRpc(
+            'task-report',
+            function (Payload $payload) {
+                return $this->handleProgressReport($payload);
+            }
+        );
     }
 
     public function setOptions(array $options)
@@ -66,7 +69,7 @@ class PoolWorker extends Worker
                 $event,
                 function (ProgressReporter $reporter) {
                     $task = $reporter->getTask();
-                    if ($task instanceof LoopAwareInterface) {
+                    if (!$task instanceof LoopAwareInterface) {
                         $this->busy = false;
                     }
 
@@ -88,8 +91,9 @@ class PoolWorker extends Worker
                 function () use ($task) {
                     if (!$task instanceof LoopAwareInterface) {
                         $this->busy = false;
-                        unset($this->tasks[$task->getId()]);
                     }
+
+                    unset($this->tasks[$task->getId()]);
                 }
             );
     }
