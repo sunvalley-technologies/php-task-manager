@@ -5,6 +5,7 @@ namespace SunValley\TaskManager\TaskQueue;
 use React\EventLoop\LoopInterface;
 use React\Promise\ExtendedPromiseInterface;
 use SunValley\TaskManager\Exception\TaskQueueException;
+use SunValley\TaskManager\LoopAwareInterface;
 use SunValley\TaskManager\TaskInterface;
 use SunValley\TaskManager\TaskQueueInterface;
 use function React\Promise\reject;
@@ -58,9 +59,22 @@ class InMemoryTaskQueue implements TaskQueueInterface
     }
 
     /** @inheritDoc */
-    public function dequeue(): ?TaskInterface
+    public function dequeue(bool $asyncOnly = false): ?TaskInterface
     {
-        $task = array_shift($this->queue);
+        if (!$asyncOnly) {
+            $task = array_shift($this->queue);
+        } else {
+            $task = null;
+            foreach ($this->queue as $key => $item) {
+                if ($item instanceof LoopAwareInterface) {
+                    $task = $item;
+                    unset($this->queue[$key]);
+
+                    break;
+                }
+            }
+        }
+
         $task !== null && $this->processingQueue[$task->getId()] = $task;
 
         return $task;
@@ -113,5 +127,29 @@ class InMemoryTaskQueue implements TaskQueueInterface
     public function onAvailableTask(callable $callback): void
     {
         $this->onAvailableCallback = $callback;
+    }
+
+    /** @inheritDoc */
+    public function count(): int
+    {
+        return count($this->queue);
+    }
+
+    /**
+     * Returns all failed tasks
+     *
+     * @return TaskInterface[]
+     */
+    public function getFailedTasks(): array
+    {
+        return $this->failedTasks;
+    }
+
+    /**
+     * Clears all failed tasks
+     */
+    public function clearFailedTasks(): void
+    {
+        $this->failedTasks = [];
     }
 }
