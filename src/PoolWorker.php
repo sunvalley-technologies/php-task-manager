@@ -27,13 +27,8 @@ class PoolWorker extends Worker
     public function __construct(Messenger $messenger)
     {
         parent::__construct($messenger);
-        
-        $messenger->registerRpc(
-            'task-report',
-            function (Payload $payload) {
-                return $this->handleProgressReport($payload);
-            }
-        );
+
+        $messenger->registerRpc('task-report', \Closure::fromCallable([$this, 'handleProgressReport']));
     }
 
     public function setOptions(array $options)

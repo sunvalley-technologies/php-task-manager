@@ -15,4 +15,8 @@ class Stats
 
     const MAX_PROCESSES = 'max_processes';
 
+    const CURRENT_PROCESSES = 'current_processes';
+
+    const CURRENT_TASKS = 'current_tasks';
+
 }

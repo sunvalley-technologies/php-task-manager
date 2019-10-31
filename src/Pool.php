@@ -5,19 +5,18 @@ namespace SunValley\TaskManager;
 use Evenement\EventEmitter;
 use React\EventLoop\LoopInterface;
 use React\Promise\ExtendedPromiseInterface;
+use React\Promise\PromiseInterface;
 use SunValley\TaskManager\Exception\PoolException;
 use WyriHaximus\React\ChildProcess\Messenger\Messages\Message;
-use WyriHaximus\React\ChildProcess\Messenger\Messages\Rpc;
 use WyriHaximus\React\ChildProcess\Messenger\Messenger;
 use SunValley\TaskManager\PoolOptions as Options;
-use WyriHaximus\React\ChildProcess\Pool\PoolInterface;
 use WyriHaximus\React\ChildProcess\Pool\ProcessCollectionInterface;
 use function React\Promise\all;
 use function React\Promise\reject;
 use function WyriHaximus\React\timedPromise;
 
 /** @internal */
-class Pool extends EventEmitter implements PoolInterface
+class Pool extends EventEmitter
 {
 
     /** @var array */
@@ -66,37 +65,25 @@ class Pool extends EventEmitter implements PoolInterface
         $this->loop              = $loop;
     }
 
-    /** @inheritDoc */
-    public function rpc(Rpc $message)
-    {
-        throw new \BadMethodCallException('This method is not supported for this pool. Use submitTask method instead.');
-    }
-
     /**
      * Submit a task and return a promise for the sent task.
      *
      * @param ProgressReporter $reporter
      *
-     * @return ExtendedPromiseInterface Promise is resolved when the job is submitted. Not when the job is completed.
+     * @return ExtendedPromiseInterface|PromiseInterface Promise is resolved when the job is submitted. Not when the
+     *                                                   job is completed.
      */
-    public function submitTask(ProgressReporter $reporter): ExtendedPromiseInterface
+    public function submitTask(ProgressReporter $reporter): PromiseInterface
     {
         // bind for statistics
-        $reporter->on(
-            'done',
-            function () {
-                $this->stats[Stats::COMPLETED_TASKS]++;
-                $this->stats[Stats::TOTAL_TASKS]++;
-            }
-        );
-        $reporter->on(
-            'failed',
-            function () {
-                $this->stats[Stats::FAILED_TASKS]++;
-                $this->stats[Stats::TOTAL_TASKS]++;
-            }
-        );
+        $reporter->on('done', \Closure::fromCallable([$this, 'handleCompletedTask']));
+        $reporter->on('failed', \Closure::fromCallable([$this, 'handleFailedTask']));
 
+        return $this->__submitTask($reporter);
+    }
+
+    protected function __submitTask(ProgressReporter $reporter)
+    {
         $async = $reporter->getTask() instanceof LoopAwareInterface;
         foreach ($this->workers as $worker) {
             if ($async && !$worker->isBusy()) {
@@ -106,22 +93,38 @@ class Pool extends EventEmitter implements PoolInterface
             }
         }
 
+        $workerPromise = $this->ping();
+        if ($workerPromise !== null) {
+            return $workerPromise->then(
+                function () use ($reporter) {
+                    return $this->__submitTask($reporter);
+                },
+                function ($e) {
+                    return reject(
+                        new PoolException(sprintf('No free worker available for the task! Message: %s', (string)$e))
+                    );
+                }
+            );
+        }
+
         return reject(new PoolException('No free worker available for the task!'));
     }
 
-    /** @inheritDoc */
-    public function message(Message $message)
+    protected function handleCompletedTask(ProgressReporter $reporter)
     {
-        throw new \BadMethodCallException('This method is not supported for this pool.');
+        $this->stats[Stats::COMPLETED_TASKS]++;
+        $this->stats[Stats::TOTAL_TASKS]++;
+    }
+
+    protected function handleFailedTask(ProgressReporter $reporter)
+    {
+        $this->stats[Stats::FAILED_TASKS]++;
+        $this->stats[Stats::TOTAL_TASKS]++;
     }
 
     /** @inheritDoc */
-    public function terminate(Message $message, $timeout = 5, $signal = null)
+    public function terminate($timeout = 5)
     {
-        if ($message !== null) {
-            $this->message($message);
-        }
-
         return timedPromise($this->loop, $timeout)->then(
             function () {
                 $promises = [];
@@ -140,50 +143,51 @@ class Pool extends EventEmitter implements PoolInterface
      */
     public function info()
     {
-        return $this->stats;
+        $stats = [
+                Stats::CURRENT_PROCESSES => count($this->workers),
+                Stats::CURRENT_TASKS     => array_sum(
+                    array_map(
+                        function (PoolWorker $worker) {
+                            return $worker->taskCount();
+                        },
+                        $this->workers
+                    )
+                ),
+            ] + $this->stats;
+
+        return $stats;
     }
 
-    public function ping(): bool
+    /**
+     * @return ExtendedPromiseInterface|null Returns spawn promise or null if no process is going to be started
+     */
+    public function ping(): ?ExtendedPromiseInterface
     {
         if ($this->canProcessSyncTask()) {
-            return true;
+            return null;
         }
 
         if (count($this->workers) + $this->startingProcesses < $this->options[Options::MIN_SIZE]) {
-            $this->spawn();
-
-            return false;
+            return $this->spawn();
         }
 
         if (count($this->workers) + $this->startingProcesses < $this->options[Options::MAX_SIZE]) {
-            $this->spawn();
+            return $this->spawn();
         }
 
-        return false;
+        return null;
     }
-
-    protected function spawn()
+    
+    protected function spawn(): ?ExtendedPromiseInterface
     {
         $this->startingProcesses++;
         $current = $this->processCollection->current();
         $promise = $this->spawnAndGetMessenger($current);
         $promise->done(
             function (Messenger $messenger) {
-                $worker = new PoolWorker($messenger);
-                $worker->setOptions(
-                    [
-                        Options::MAX_JOBS_PER_PROCESS => $this->options[Options::MAX_JOBS_PER_PROCESS],
-                        Options::TTL                  => $this->options[Options::TTL],
-                    ]
-                );
-                $worker->on('done', [$this, 'ttl']);
-                $this->workers[] = $worker;
-                $workerCount     = count($this->workers);
-                if ($this->stats[Stats::MAX_PROCESSES] < $workerCount) {
-                    $this->stats[Stats::MAX_PROCESSES] = $workerCount;
-                }
+                $this->buildWorker($messenger);
 
-                $this->startingProcesses--;
+                return $this;
             },
             function () {
                 $this->ping();
@@ -194,6 +198,40 @@ class Pool extends EventEmitter implements PoolInterface
         if (!$this->processCollection->valid()) {
             $this->processCollection->rewind();
         }
+
+        return $promise;
+    }
+
+    protected function buildWorker(Messenger $messenger)
+    {
+        $worker = new PoolWorker($messenger);
+        $worker->setOptions(
+            [
+                Options::MAX_JOBS_PER_PROCESS => $this->options[Options::MAX_JOBS_PER_PROCESS],
+                Options::TTL                  => $this->options[Options::TTL],
+            ]
+        );
+        $worker->on('done', \Closure::fromCallable([$this, 'ttl']));
+        $worker->on(
+            'terminating',
+            function (PoolWorker $worker) {
+                foreach ($this->workers as $key => $value) {
+                    if ($worker === $value) {
+                        unset($this->workers[$key]);
+                        break;
+                    }
+                }
+            }
+        );
+        $this->workers[] = $worker;
+        $workerCount     = count($this->workers);
+        if ($this->stats[Stats::MAX_PROCESSES] < $workerCount) {
+            $this->stats[Stats::MAX_PROCESSES] = $workerCount;
+        }
+
+        $this->startingProcesses--;
+
+        return $worker;
     }
 
     protected function spawnAndGetMessenger(callable $current): ExtendedPromiseInterface
@@ -252,4 +290,5 @@ class Pool extends EventEmitter implements PoolInterface
 
         return false;
     }
+    
 }
