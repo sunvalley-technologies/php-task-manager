@@ -4,7 +4,6 @@
 namespace SunValley\TaskManager;
 
 use Eloquent\Enumeration\AbstractEnumeration;
-use MyCLabs\Enum\Enum;
 
 /**
  * Class TaskStatus indicates task statuses that can be used by tasks while processing a task

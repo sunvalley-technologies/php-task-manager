@@ -12,9 +12,6 @@ class Configuration
     private $maxProcesses = 10;
 
     /** @var int */
-    private $maxRunningTasks = 50;
-
-    /** @var int */
     private $ttl = 60;
 
     /** @var int */
@@ -58,25 +55,6 @@ class Configuration
     public function setMinProcesses(int $minProcesses): void
     {
         $this->minProcesses = $minProcesses;
-    }
-
-    /**
-     * Get maximum tasks that are running at one time. Since each pool worker can take more than one task if the task
-     * is asyncronous.
-     *
-     * @return int
-     */
-    public function getMaxRunningTasks(): int
-    {
-        return $this->maxRunningTasks;
-    }
-
-    /**
-     * @param int $maxRunningTasks
-     */
-    public function setMaxRunningTasks(int $maxRunningTasks): void
-    {
-        $this->maxRunningTasks = $maxRunningTasks;
     }
 
     /**

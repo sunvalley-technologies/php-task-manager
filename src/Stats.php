@@ -19,4 +19,9 @@ class Stats
 
     const CURRENT_TASKS = 'current_tasks';
 
+    const _GROUP_QUEUE = 'queue';
+
+    const _GROUP_POOL = 'pool';
+    
+    
 }

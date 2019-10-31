@@ -6,6 +6,7 @@ use React\EventLoop\LoopInterface;
 use React\Promise\ExtendedPromiseInterface;
 use SunValley\TaskManager\Exception\TaskQueueException;
 use SunValley\TaskManager\LoopAwareInterface;
+use SunValley\TaskManager\Stats;
 use SunValley\TaskManager\TaskInterface;
 use SunValley\TaskManager\TaskQueueInterface;
 use function React\Promise\reject;
@@ -151,5 +152,19 @@ class InMemoryTaskQueue implements TaskQueueInterface
     public function clearFailedTasks(): void
     {
         $this->failedTasks = [];
+    }
+
+    /** @inheritDoc */
+    public function close(): ExtendedPromiseInterface
+    {
+        return resolve();
+    }
+
+    /** @inheritDoc */
+    public function info(): array
+    {
+        return [
+            Stats::CURRENT_TASKS => $this->count(),
+        ];
     }
 }

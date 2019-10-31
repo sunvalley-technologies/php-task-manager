@@ -84,4 +84,18 @@ interface TaskQueueInterface
      * @return int
      */
     public function count(): int;
+
+    /**
+     * Close the queue. This is called when the task manager is getting closed. Can be used to clean-up.
+     * 
+     * @return ExtendedPromiseInterface
+     */
+    public function close(): ExtendedPromiseInterface;
+
+    /**
+     * Returns an array which keys should be one of Stats class constant.
+     * 
+     * @return array
+     */
+    public function info(): array;
 }

@@ -7,7 +7,6 @@ use React\EventLoop\LoopInterface;
 use React\Promise\ExtendedPromiseInterface;
 use React\Promise\PromiseInterface;
 use SunValley\TaskManager\Exception\PoolException;
-use WyriHaximus\React\ChildProcess\Messenger\Messages\Message;
 use WyriHaximus\React\ChildProcess\Messenger\Messenger;
 use SunValley\TaskManager\PoolOptions as Options;
 use WyriHaximus\React\ChildProcess\Pool\ProcessCollectionInterface;
@@ -123,19 +122,15 @@ class Pool extends EventEmitter
     }
 
     /** @inheritDoc */
-    public function terminate($timeout = 5)
+    public function terminate()
     {
-        return timedPromise($this->loop, $timeout)->then(
-            function () {
-                $promises = [];
+        $promises = [];
 
-                foreach ($this->workers as $worker) {
-                    $promises[] = $worker->terminate();
-                }
+        foreach ($this->workers as $worker) {
+            $promises[] = $worker->terminate();
+        }
 
-                return all($promises);
-            }
-        );
+        return all($promises);
     }
 
     /**

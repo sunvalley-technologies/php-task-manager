@@ -76,6 +76,6 @@ class ProcessTest extends TestCase
             $this->assertTrue(isset($foundResults[$task->getId()]));
             $this->assertEquals($task->getOptions()['return'], $foundResults[$task->getId()]);
         }
-        $method->shouldHaveBeenCalledTimes(3);
+        $method->shouldHaveBeenCalledTimes(9);
     }
 }

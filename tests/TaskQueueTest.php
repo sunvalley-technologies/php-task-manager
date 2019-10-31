@@ -1,12 +1,9 @@
 <?php
 
-
 namespace SunValley\TaskManager\Tests;
-
 
 use PHPUnit\Framework\TestCase;
 use React\EventLoop\Factory;
-use SunValley\TaskManager\ProgressReporter;
 use SunValley\TaskManager\TaskQueue\InMemoryTaskQueue;
 use SunValley\TaskManager\Tests\Fixtures\AsyncTask;
 use SunValley\TaskManager\Tests\Fixtures\MultiplyTask;

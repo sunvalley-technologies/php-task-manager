@@ -10,7 +10,6 @@ use React\Promise\ExtendedPromiseInterface;
 use WyriHaximus\FileDescriptors\Factory as FDFactory;
 use WyriHaximus\React\ChildProcess\Pool\Launcher\ClassName;
 use SunValley\TaskManager\PoolOptions as Options;
-use WyriHaximus\React\ChildProcess\Pool\PoolInterface;
 use WyriHaximus\React\ChildProcess\Pool\ProcessCollection\Single;
 
 /**
@@ -58,7 +57,7 @@ class TaskManager extends EventEmitter
         $this->loop          = $loop;
         $this->queue         = $queue;
         $this->configuration = $configuration;
-        $this->queue->onAvailableTask([$this, 'checkQueue']);
+        $this->queue->onAvailableTask(\Closure::fromCallable([$this, 'checkQueue']));
 
         // Setup process collection
         $processCollection = new Single(new ClassName(Process::class));
@@ -74,7 +73,7 @@ class TaskManager extends EventEmitter
         ];
 
         $this->pool = new Pool($processCollection, $loop, $options);
-        $this->loop->addPeriodicTimer(1, [$this, 'checkQueue']);
+        $this->setIdleQueueTimer();
     }
 
     protected function setIdleQueueTimer()
@@ -101,13 +100,19 @@ class TaskManager extends EventEmitter
             $this->loop->cancelTimer($this->queueTimer);
         }
 
-        $this->queueTimer = $this->loop->addPeriodicTimer($interval, [$this, 'checkQueue']);
+        $this->queueTimer = $this->loop->addPeriodicTimer(
+            $interval,
+            function () {
+                $this->checkQueue();
+            }
+        );
     }
 
     protected function checkQueue()
     {
         if (!$this->pool->canProcessAsyncTask() && $this->queue->count()) {
             $this->setBusyQueueTimer();
+            $this->pool->ping();
 
             return;
         }
@@ -115,6 +120,8 @@ class TaskManager extends EventEmitter
         while (($task = $this->queue->dequeue($this->pool->canProcessSyncTask() === false)) !== null) {
             $this->handleTask($task);
         }
+
+        $this->setIdleQueueTimer();
     }
 
     protected function handleTask(TaskInterface $task)
@@ -217,4 +224,18 @@ class TaskManager extends EventEmitter
         return $deferred->promise();
     }
 
+    public function terminate()
+    {
+        $this->queueTimer !== null && $this->loop->cancelTimer($this->queueTimer);
+        $this->queue->close();
+        $this->pool->terminate();
+    }
+
+    public function stats(): array
+    {
+        return [
+            Stats::_GROUP_POOL  => $this->pool->info(),
+            Stats::_GROUP_QUEUE => $this->queue->info(),
+        ];
+    }
 }

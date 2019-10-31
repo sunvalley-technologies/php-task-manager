@@ -30,6 +30,9 @@ class AsyncTask extends AbstractTask implements LoopAwareInterface
     /** @inheritDoc */
     protected function _run(LoopInterface $loop, ProgressReporter $reporter): PromiseInterface
     {
+        $reporter->setMessage(sprintf('Progress will finish in %d seconds', $this->getOptions()['timer']));
+        $reporter->setCompletion(50);
+
         $deferred = new Deferred();
         $loop->addTimer(
             $this->getOptions()['timer'],
