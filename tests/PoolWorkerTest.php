@@ -3,15 +3,16 @@
 namespace SunValley\TaskManager\Tests;
 
 use PHPUnit\Framework\TestCase;
+use React\ChildProcess\Process;
 use React\Socket\ConnectionInterface;
 use SunValley\TaskManager\PoolOptions;
 use SunValley\TaskManager\PoolWorker;
+use SunValley\TaskManager\ProcessAwareMessenger;
 use SunValley\TaskManager\ProgressReporter;
 use SunValley\TaskManager\TaskStatus;
 use SunValley\TaskManager\Tests\Fixtures\AsyncTask;
 use SunValley\TaskManager\Tests\Fixtures\MultiplyTask;
 use WyriHaximus\React\ChildProcess\Messenger\Messages\Payload;
-use WyriHaximus\React\ChildProcess\Messenger\Messenger;
 
 class PoolWorkerTest extends TestCase
 {
@@ -19,7 +20,8 @@ class PoolWorkerTest extends TestCase
     public function testSyncTask()
     {
         $connection = $this->prophesize(ConnectionInterface::class);
-        $messenger  = new Messenger($connection->reveal());
+        $process    = $this->prophesize(Process::class);
+        $messenger  = new ProcessAwareMessenger($process->reveal(), $connection->reveal());
         $worker     = new PoolWorker($messenger);
 
         $task             = $this->buildSyncTask();
@@ -68,7 +70,8 @@ class PoolWorkerTest extends TestCase
     public function testSyncTaskFail()
     {
         $connection = $this->prophesize(ConnectionInterface::class);
-        $messenger  = new Messenger($connection->reveal());
+        $process    = $this->prophesize(Process::class);
+        $messenger  = new ProcessAwareMessenger($process->reveal(), $connection->reveal());
         $worker     = new PoolWorker($messenger);
 
         $task       = $this->buildSyncTask();
@@ -104,7 +107,8 @@ class PoolWorkerTest extends TestCase
     public function testAsyncTask()
     {
         $connection = $this->prophesize(ConnectionInterface::class);
-        $messenger  = new Messenger($connection->reveal());
+        $process    = $this->prophesize(Process::class);
+        $messenger  = new ProcessAwareMessenger($process->reveal(), $connection->reveal());
         $worker     = new PoolWorker($messenger);
         $worker->setOptions([PoolOptions::MAX_JOBS_PER_PROCESS => 2]);
 

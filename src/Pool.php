@@ -12,7 +12,6 @@ use SunValley\TaskManager\PoolOptions as Options;
 use WyriHaximus\React\ChildProcess\Pool\ProcessCollectionInterface;
 use function React\Promise\all;
 use function React\Promise\reject;
-use function WyriHaximus\React\timedPromise;
 
 /** @internal */
 class Pool extends EventEmitter

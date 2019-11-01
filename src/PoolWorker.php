@@ -17,6 +17,9 @@ class PoolWorker extends Worker
 
     /** @var ProgressReporter[] */
     protected $tasks = [];
+    
+    /** @var ProcessAwareMessenger */
+    protected $messenger;
 
     /** @var array */
     protected $options = [
@@ -26,6 +29,9 @@ class PoolWorker extends Worker
 
     public function __construct(Messenger $messenger)
     {
+        if (!$messenger instanceof ProcessAwareMessenger) {
+            throw new \RuntimeException('Wrong messenger instance is sent to pool worker.');
+        }
         parent::__construct($messenger);
 
         $messenger->registerRpc('task-report', \Closure::fromCallable([$this, 'handleProgressReport']));

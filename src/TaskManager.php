@@ -8,7 +8,6 @@ use React\EventLoop\TimerInterface;
 use React\Promise\Deferred;
 use React\Promise\ExtendedPromiseInterface;
 use WyriHaximus\FileDescriptors\Factory as FDFactory;
-use WyriHaximus\React\ChildProcess\Pool\Launcher\ClassName;
 use SunValley\TaskManager\PoolOptions as Options;
 use WyriHaximus\React\ChildProcess\Pool\ProcessCollection\Single;
 
@@ -60,7 +59,7 @@ class TaskManager extends EventEmitter
         $this->queue->onAvailableTask(\Closure::fromCallable([$this, 'checkQueue']));
 
         // Setup process collection
-        $processCollection = new Single(new ClassName(Process::class));
+        $processCollection = new Single(new ProcessLauncher());
 
         // Setup options
         /** @noinspection PhpUnhandledExceptionInspection */

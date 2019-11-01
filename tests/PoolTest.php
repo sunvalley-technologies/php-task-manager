@@ -4,17 +4,18 @@ namespace SunValley\TaskManager\Tests;
 
 use PHPUnit\Framework\MockObject\Matcher\AnyInvokedCount;
 use PHPUnit\Framework\TestCase;
+use React\ChildProcess\Process;
 use React\EventLoop\Factory as LoopFactory;
 use React\EventLoop\LoopInterface;
 use React\Socket\ConnectionInterface;
 use SunValley\TaskManager\Exception\PoolException;
 use SunValley\TaskManager\Pool;
 use SunValley\TaskManager\PoolOptions;
+use SunValley\TaskManager\ProcessAwareMessenger;
 use SunValley\TaskManager\ProgressReporter;
 use SunValley\TaskManager\Stats;
 use SunValley\TaskManager\Tests\Fixtures\AsyncTask;
 use SunValley\TaskManager\Tests\Fixtures\MultiplyTask;
-use WyriHaximus\React\ChildProcess\Messenger\Messenger;
 use WyriHaximus\React\ChildProcess\Pool\ProcessCollectionInterface;
 use function React\Promise\resolve;
 
@@ -96,8 +97,8 @@ class PoolTest extends TestCase
         $this->assertEquals(1, $pool->info()[Stats::FAILED_TASKS]);
         $this->assertEquals(1, $pool->info()[Stats::COMPLETED_TASKS]);
         $this->assertEquals(2, $pool->info()[Stats::TOTAL_TASKS]);
-        
-        
+
+
     }
 
     protected function generatePool(LoopInterface $loop, array $options = [])
@@ -113,7 +114,10 @@ class PoolTest extends TestCase
                          ->setMethods(['spawn'])
                          ->getMock();
 
-        $messenger = new Messenger($this->prophesize(ConnectionInterface::class)->reveal());
+        $messenger = new ProcessAwareMessenger(
+            $this->prophesize(Process::class)->reveal(),
+            $this->prophesize(ConnectionInterface::class)->reveal()
+        );
         $poolMock->expects($spy = $this->any())->method('spawn')->willReturnCallback(
             \Closure::fromCallable(
                 function () use ($messenger) {
