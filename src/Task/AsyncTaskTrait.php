@@ -1,9 +1,11 @@
 <?php
 
-namespace SunValley\TaskManager;
+namespace SunValley\TaskManager\Task;
 
 use React\EventLoop\LoopInterface;
 use React\Promise\PromiseInterface;
+use SunValley\TaskManager\ProgressReporter;
+use SunValley\TaskManager\TaskStatus;
 
 trait AsyncTaskTrait
 {

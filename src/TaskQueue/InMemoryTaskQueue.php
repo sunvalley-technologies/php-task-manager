@@ -58,6 +58,12 @@ class InMemoryTaskQueue implements TaskQueueInterface
 
         return resolve();
     }
+    
+    /** @inheritDoc */
+    public function enqueueRemote(TaskInterface $task): ExtendedPromiseInterface
+    {
+        throw new \BadMethodCallException('This queue does not support remote operations!');
+    }
 
     /** @inheritDoc */
     public function dequeue(bool $asyncOnly = false): ExtendedPromiseInterface
@@ -98,6 +104,12 @@ class InMemoryTaskQueue implements TaskQueueInterface
         unset($this->queue[$task->getId()]);
 
         return resolve();
+    }
+    
+    /** @inheritDoc */
+    public function cancelRemote(TaskInterface $task): ExtendedPromiseInterface
+    {
+        throw new \BadMethodCallException('This queue does not support remote operations!');
     }
 
     /** @inheritDoc */

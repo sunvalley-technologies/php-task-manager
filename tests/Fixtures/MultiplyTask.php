@@ -2,7 +2,7 @@
 
 namespace SunValley\TaskManager\Tests\Fixtures;
 
-use SunValley\TaskManager\AbstractTask;
+use SunValley\TaskManager\Task\AbstractTask;
 use SunValley\TaskManager\ProgressReporter;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 

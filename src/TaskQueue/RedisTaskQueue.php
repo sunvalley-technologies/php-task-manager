@@ -5,13 +5,11 @@ namespace SunValley\TaskManager\TaskQueue;
 use Clue\React\Redis\Client as RedisClient;
 use Clue\React\Redis\Factory as RedisFactory;
 use React\EventLoop\LoopInterface;
-use React\Promise\Deferred;
 use React\Promise\ExtendedPromiseInterface;
 use React\Promise\PromiseInterface;
 use SunValley\TaskManager\Exception\TaskQueueRetryException;
 use SunValley\TaskManager\Exception\TaskQueueException;
 use SunValley\TaskManager\LoopAwareInterface;
-use SunValley\TaskManager\Process;
 use SunValley\TaskManager\Stats;
 use SunValley\TaskManager\TaskInterface;
 use SunValley\TaskManager\TaskQueueInterface;
@@ -23,8 +21,8 @@ use function React\Promise\resolve;
  * Class RedisTaskQueue utilizes redis lists to provide a task queue.
  *
  * This implementation can be used safely from different processes which makes the task manager scalable on many
- * instances. Internally this implementation uses a sorted set for queue. There is also a hash that stores serialized
- * task data and a set that stores canceled tasks.
+ * instances. Internally this implementation uses two lists as queues one for sync tasks and one for async tasks. There
+ * is also a hash that stores serialized task data and a set that stores canceled tasks.
  *
  * Since there are two different queues for sync and async tasks, task execution depends on the availability of the
  * workers. In a full queue, async tasks are always favored over sync tasks.
@@ -117,6 +115,12 @@ class RedisTaskQueue implements TaskQueueInterface
                     return reject(new TaskQueueException('Failed to save the task'));
                 }
             );
+    }
+
+    /** @inheritDoc */
+    public function enqueueRemote(TaskInterface $task): ExtendedPromiseInterface
+    {
+        return $this->enqueue($task);
     }
 
     /** @inheritDoc */
@@ -258,6 +262,12 @@ class RedisTaskQueue implements TaskQueueInterface
                     }
                 }
             );
+    }
+    
+    /** @inheritDoc */
+    public function cancelRemote(TaskInterface $task): ExtendedPromiseInterface
+    {
+        return $this->cancel($task);
     }
 
     /** @inheritDoc */

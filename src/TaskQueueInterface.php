@@ -29,6 +29,18 @@ interface TaskQueueInterface
     public function enqueue(TaskInterface $task): ExtendedPromiseInterface;
 
     /**
+     * Add the given task to this queue using the queues remote interface.
+     *
+     * @param TaskInterface $task
+     *
+     * @return ExtendedPromiseInterface Should return a promise for result of the action. Promise should be resolved
+     *                                  when task is submitted to queue with no value while if it fails it should be
+     *                                  rejected.
+     * @throws Exception\TaskQueueException
+     */
+    public function enqueueRemote(TaskInterface $task): ExtendedPromiseInterface;
+
+    /**
      * Gets a task from this queue. This method should not block.
      *
      * @param bool $asyncOnly If given TRUE, this dequeue should only return an async task.
@@ -47,6 +59,15 @@ interface TaskQueueInterface
      * @return ExtendedPromiseInterface Should return a promise to report if cancel is successful or not
      */
     public function cancel(TaskInterface $task): ExtendedPromiseInterface;
+
+    /**
+     * Cancel the given task from remote interface. This does not stop the execution of the task if it is running.
+     *
+     * @param TaskInterface $task
+     *
+     * @return ExtendedPromiseInterface Should return a promise to report if cancel is successful or not
+     */
+    public function cancelRemote(TaskInterface $task): ExtendedPromiseInterface;
 
     /**
      * Method that informs queue that a task is completed with success

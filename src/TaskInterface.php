@@ -7,7 +7,7 @@ namespace SunValley\TaskManager;
  *
  * @package SunValley\TaskManager
  */
-interface TaskInterface
+interface TaskInterface extends \Serializable
 {
 
     /**

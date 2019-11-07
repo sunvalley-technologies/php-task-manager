@@ -1,8 +1,9 @@
 <?php
 
-namespace SunValley\TaskManager;
+namespace SunValley\TaskManager\Task;
 
 use SunValley\TaskManager\Exception\TaskOptionValidationException;
+use SunValley\TaskManager\TaskInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
@@ -75,6 +76,27 @@ abstract class AbstractTask implements TaskInterface
         return $this->optionsResolver;
     }
 
+    public function serialize()
+    {
+        return json_encode(
+            [
+                'id'      => $this->getId(),
+                'options' => $this->getOptions(),
+            ]
+        );
+    }
+
+    public function unserialize($serialized)
+    {
+        $data = json_decode($serialized, true);
+        if (!isset($data['id'])) {
+            throw new \RuntimeException('Serialization failure. Cannot find `id` index of serialized task.');
+        }
+
+        $this->id      = $data['id'];
+        $this->options = $data['options'] ?? [];
+    }
+
     /**
      * Return options resolver to limit arguments
      *
@@ -82,11 +104,4 @@ abstract class AbstractTask implements TaskInterface
      */
     abstract function buildOptionsResolver(): OptionsResolver;
 
-    public function __sleep()
-    {
-        return [
-            'id',
-            'options',
-        ];
-    }
 }
