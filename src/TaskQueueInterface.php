@@ -21,7 +21,9 @@ interface TaskQueueInterface
      *
      * @param TaskInterface $task
      *
-     * @return ExtendedPromiseInterface Should return a promise for result of the action
+     * @return ExtendedPromiseInterface Should return a promise for result of the action. Promise should be resolved
+     *                                  when task is submitted to queue with no value while if it fails it should be
+     *                                  rejected.
      * @throws Exception\TaskQueueException
      */
     public function enqueue(TaskInterface $task): ExtendedPromiseInterface;
@@ -31,9 +33,11 @@ interface TaskQueueInterface
      *
      * @param bool $asyncOnly If given TRUE, this dequeue should only return an async task.
      *
-     * @return TaskInterface|null
+     * @return ExtendedPromiseInterface<?TaskInterface> Resolves when a task is dequeue and receives task as value or
+     *                                                  rejection if an error occurred with a task. If there are no
+     *                                                  tasks in queue, NULL is passed as value.
      */
-    public function dequeue(bool $asyncOnly = false): ?TaskInterface;
+    public function dequeue(bool $asyncOnly = false): ExtendedPromiseInterface;
 
     /**
      * Cancel the given task. This does not stop the execution of the task if it is running.
@@ -68,6 +72,7 @@ interface TaskQueueInterface
      * @param TaskInterface $task
      *
      * @return ExtendedPromiseInterface Should return a promise to report if refund is successful or not
+     * @internal Should only be used by library methods
      */
     public function refund(TaskInterface $task): ExtendedPromiseInterface;
 
@@ -80,22 +85,27 @@ interface TaskQueueInterface
 
     /**
      * Returns the count of tasks in queue
-     * 
+     *
      * @return int
      */
     public function count(): int;
 
     /**
      * Close the queue. This is called when the task manager is getting closed. Can be used to clean-up.
-     * 
+     *
      * @return ExtendedPromiseInterface
      */
     public function close(): ExtendedPromiseInterface;
 
     /**
      * Returns an array which keys should be one of Stats class constant.
-     * 
+     *
      * @return array
      */
     public function info(): array;
+
+    /**
+     * Start the queue operations before dequeue
+     */
+    public function start(): void;
 }

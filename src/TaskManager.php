@@ -7,6 +7,7 @@ use React\EventLoop\LoopInterface;
 use React\EventLoop\TimerInterface;
 use React\Promise\Deferred;
 use React\Promise\ExtendedPromiseInterface;
+use SunValley\TaskManager\Exception\TaskQueueRetryException;
 use WyriHaximus\FileDescriptors\Factory as FDFactory;
 use SunValley\TaskManager\PoolOptions as Options;
 use WyriHaximus\React\ChildProcess\Pool\ProcessCollection\Single;
@@ -116,11 +117,23 @@ class TaskManager extends EventEmitter
             return;
         }
 
-        while (($task = $this->queue->dequeue($this->pool->canProcessSyncTask() === false)) !== null) {
-            $this->handleTask($task);
-        }
-
-        $this->setIdleQueueTimer();
+        $this->queue->dequeue($this->pool->canProcessSyncTask() === false)->otherwise(
+            function (?\Throwable $exception) {
+                if ($exception instanceof TaskQueueRetryException) {
+                    $this->checkQueue();
+                }
+                
+                // TODO: Report problem somewhere ?
+            }
+        )->done(
+            function (?TaskInterface $task) {
+                if ($task === null) {
+                    $this->setIdleQueueTimer();
+                } else {
+                    $this->handleTask($task);
+                }
+            }
+        );
     }
 
     protected function handleTask(TaskInterface $task)

@@ -60,7 +60,7 @@ class InMemoryTaskQueue implements TaskQueueInterface
     }
 
     /** @inheritDoc */
-    public function dequeue(bool $asyncOnly = false): ?TaskInterface
+    public function dequeue(bool $asyncOnly = false): ExtendedPromiseInterface
     {
         if (!$asyncOnly) {
             $task = array_shift($this->queue);
@@ -77,8 +77,11 @@ class InMemoryTaskQueue implements TaskQueueInterface
         }
 
         $task !== null && $this->processingQueue[$task->getId()] = $task;
-
-        return $task;
+        if ($task !== null) {
+            return resolve($task);
+        }
+        
+        return reject();
     }
 
     /** @inheritDoc */
@@ -166,5 +169,11 @@ class InMemoryTaskQueue implements TaskQueueInterface
         return [
             Stats::CURRENT_TASKS => $this->count(),
         ];
+    }
+
+    /** @inheritDoc */
+    public function start(): void
+    {
+
     }
 }

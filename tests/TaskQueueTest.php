@@ -7,6 +7,7 @@ use React\EventLoop\Factory;
 use SunValley\TaskManager\TaskQueue\InMemoryTaskQueue;
 use SunValley\TaskManager\Tests\Fixtures\AsyncTask;
 use SunValley\TaskManager\Tests\Fixtures\MultiplyTask;
+use function Clue\React\Block\await;
 
 class TaskQueueTest extends TestCase
 {
@@ -39,13 +40,13 @@ class TaskQueueTest extends TestCase
         $this->assertTrue($cbCalled);
 
         // dequeue
-        $task = $queue->dequeue();
+        $task = await($queue->dequeue(), $loop);
         $this->assertSame($task1, $task);
         $this->assertEquals(4, $queue->count());
         $queue->complete($task);
 
         // dequeue async
-        $task = $queue->dequeue(true);
+        $task = await($queue->dequeue(true), $loop);
         $this->assertSame($task1A, $task);
         $this->assertEquals(3, $queue->count());
         $queue->fail($task);
@@ -58,7 +59,7 @@ class TaskQueueTest extends TestCase
         $this->assertEquals(2, $queue->count());
 
         // try to cancel a started task
-        $task = $queue->dequeue();
+        $task = await($queue->dequeue(), $loop);
         try {
             $queue->cancel($task);
 
