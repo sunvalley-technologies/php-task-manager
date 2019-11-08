@@ -59,7 +59,8 @@ interface TaskQueueInterface
     public function dequeue(bool $asyncOnly = false): ExtendedPromiseInterface;
 
     /**
-     * Cancel the given task. This does not stop the execution of the task if it is running.
+     * Cancel the given task. This does not stop the execution of the task if it is running. If a task storage is set,
+     * also calls to cancel the task to storage when task is canceled successfully.
      *
      * @param TaskInterface $task
      *

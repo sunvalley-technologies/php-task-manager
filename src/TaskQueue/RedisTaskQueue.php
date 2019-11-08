@@ -259,8 +259,9 @@ class RedisTaskQueue extends AbstractTaskQueue
                         return reject(new TaskQueueException('Task does not exist in this queue'));
                     } else {
                         return $this->client->sadd(static::CANCEL_SET, $task->getId())->then(
-                            function () {
+                            function () use ($task) {
                                 $this->_publishTaskChange();
+                                $this->taskStorage !== null && $this->taskStorage->cancel($task);
                             }
                         );
                     }
@@ -290,11 +291,16 @@ class RedisTaskQueue extends AbstractTaskQueue
         return resolve();
     }
 
+    protected function _cleanCancellation(string $taskId)
+    {
+        $this->client->srem(static::CANCEL_SET, $taskId);
+        $this->_publishTaskChange();
+    }
+    
     protected function _cleanTask(string $taskId)
     {
         $this->client->hdel(static::TASK_STORAGE, $taskId);
-        $this->client->srem(static::CANCEL_SET, $taskId);
-        $this->_publishTaskChange();
+        $this->_cleanCancellation($taskId);
     }
 
     /** @inheritDoc */

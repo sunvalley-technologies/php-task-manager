@@ -89,6 +89,7 @@ class InMemoryTaskQueue extends AbstractTaskQueue
         }
 
         unset($this->queue[$task->getId()]);
+        $this->taskStorage !== null && $this->taskStorage->cancel($task);
 
         return resolve();
     }

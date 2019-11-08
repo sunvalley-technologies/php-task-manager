@@ -87,6 +87,7 @@ class TaskQueueTest extends TestCase
 
         $storage        = $this->createMock(TaskStorageInterface::class);
         $storage->expects($this->atLeastOnce())->method('insert');
+        $storage->expects($this->atLeastOnce())->method('cancel');
         $queue          = $this->generateRedisQueue($loop, $storage);
         $callbackCalled = false;
         $queue->onAvailableTask(
