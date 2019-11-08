@@ -23,9 +23,6 @@ class InMemoryTaskQueue extends AbstractTaskQueue
     /** @var TaskInterface[] */
     private $failedTasks = [];
 
-    /** @var LoopInterface */
-    private $loop;
-
     /** @var callable */
     private $onAvailableCallback;
 
