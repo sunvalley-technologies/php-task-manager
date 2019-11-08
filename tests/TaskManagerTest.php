@@ -11,6 +11,7 @@ use SunValley\TaskManager\Stats;
 use SunValley\TaskManager\TaskInterface;
 use SunValley\TaskManager\TaskManager;
 use SunValley\TaskManager\TaskQueue\InMemoryTaskQueue;
+use SunValley\TaskManager\TaskStorageInterface;
 use SunValley\TaskManager\Tests\Fixtures\AsyncTask;
 use SunValley\TaskManager\Tests\Fixtures\MultiplyTask;
 
@@ -26,7 +27,9 @@ class TaskManagerTest extends TestCase
         $configuration->setMaxProcesses(3);
         $configuration->setTtl(1);
 
-        $taskManager = new TaskManager($loop, $queue, $configuration);
+        $storage        = $this->createMock(TaskStorageInterface::class);
+        $storage->expects($this->atLeastOnce())->method('update');
+        $taskManager = new TaskManager($loop, $queue, $configuration, $storage);
         $task1       = $this->buildAsyncTask();
         $task2       = $this->buildAsyncTask();
 
