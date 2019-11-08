@@ -83,8 +83,11 @@ class TaskQueueTest extends TestCase
 
     public function testRedisTaskQueue()
     {
-        $loop           = Factory::create();
-        $queue          = $this->generateRedisQueue($loop);
+        $loop    = Factory::create();
+
+        $storage        = $this->createMock(TaskStorageInterface::class);
+        $storage->expects($this->atLeastOnce())->method('insert');
+        $queue          = $this->generateRedisQueue($loop, $storage);
         $callbackCalled = false;
         $queue->onAvailableTask(
             function () use (&$callbackCalled) {
