@@ -87,6 +87,16 @@ class RedisTaskStorage implements TaskStorageInterface
     }
 
     /** @inheritDoc */
+    public function cancel(TaskInterface $task): PromiseInterface
+    {
+        return $this->client->hset(
+            $this->key,
+            $task->getId(),
+            serialize(ProgressReporter::generateCancelledReporter($task))
+        );
+    }
+
+    /** @inheritDoc */
     public function delete(string $taskId): PromiseInterface
     {
         return $this->client->hdel($this->key, $taskId);

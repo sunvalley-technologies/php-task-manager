@@ -12,7 +12,6 @@ use SunValley\TaskManager\Exception\TaskQueueException;
 use SunValley\TaskManager\LoopAwareInterface;
 use SunValley\TaskManager\Stats;
 use SunValley\TaskManager\TaskInterface;
-use SunValley\TaskManager\TaskQueueInterface;
 use SunValley\TaskManager\TaskStorageInterface;
 use function React\Promise\all;
 use function React\Promise\reject;
@@ -91,7 +90,7 @@ class RedisTaskQueue extends AbstractTaskQueue
             )
             ->then(
                 function ($result) use ($task) {
-                    if ($result > 1) {
+                    if ($result > 0) {
                         if ($task instanceof LoopAwareInterface) {
                             $promise = $this->client->lpush(static::ASYNC_QUEUE, $task->getId());
                         } else {
@@ -164,7 +163,7 @@ class RedisTaskQueue extends AbstractTaskQueue
         return $retval;
     }
 
-    private function _dequeueSync(): ExtendedPromiseInterface
+    protected function _dequeueSync(): ExtendedPromiseInterface
     {
         return $this->client->rpop(static::SYNC_QUEUE)
                             ->then(
@@ -179,7 +178,7 @@ class RedisTaskQueue extends AbstractTaskQueue
                             );
     }
 
-    private function _dequeueAsync(): ExtendedPromiseInterface
+    protected function _dequeueAsync(): ExtendedPromiseInterface
     {
         return $this->client->rpop(static::ASYNC_QUEUE)
                             ->then(
@@ -194,7 +193,7 @@ class RedisTaskQueue extends AbstractTaskQueue
                             );
     }
 
-    private function _handleCancellation(?string $taskId)
+    protected function _handleCancellation(?string $taskId)
     {
         if ($taskId === null) {
             return resolve(null);
@@ -203,6 +202,8 @@ class RedisTaskQueue extends AbstractTaskQueue
         return $this->client->sismember(static::CANCEL_SET, $taskId)->then(
             function ($value) use ($taskId) {
                 if ($value) {
+                    $this->_cleanTask($taskId);
+
                     return reject(new TaskQueueRetryException());
                 } else {
                     return resolve($taskId);
@@ -218,7 +219,7 @@ class RedisTaskQueue extends AbstractTaskQueue
         );
     }
 
-    private function _handleDequeue(?string $taskId): PromiseInterface
+    protected function _handleDequeue(?string $taskId): PromiseInterface
     {
         if ($taskId === null) {
             return resolve(null);
@@ -257,7 +258,11 @@ class RedisTaskQueue extends AbstractTaskQueue
                     if (!$result) {
                         return reject(new TaskQueueException('Task does not exist in this queue'));
                     } else {
-                        return $this->client->sadd(static::CANCEL_SET, $task->getId());
+                        return $this->client->sadd(static::CANCEL_SET, $task->getId())->then(
+                            function () {
+                                $this->_publishTaskChange();
+                            }
+                        );
                     }
                 }
             );
@@ -272,7 +277,7 @@ class RedisTaskQueue extends AbstractTaskQueue
     /** @inheritDoc */
     public function complete(TaskInterface $task): ExtendedPromiseInterface
     {
-        $this->_cleanTask($task);
+        $this->_cleanTask($task->getId());
 
         return resolve();
     }
@@ -280,26 +285,45 @@ class RedisTaskQueue extends AbstractTaskQueue
     /** @inheritDoc */
     public function fail(TaskInterface $task): ExtendedPromiseInterface
     {
-        $this->_cleanTask($task);
+        $this->_cleanTask($task->getId());
 
         return resolve();
     }
 
-    private function _cleanTask(TaskInterface $task)
+    protected function _cleanTask(string $taskId)
     {
-        $this->client->hdel(static::TASK_STORAGE, $task->getId());
-        $this->client->srem(static::CANCEL_SET, $task->getId());
+        $this->client->hdel(static::TASK_STORAGE, $taskId);
+        $this->client->srem(static::CANCEL_SET, $taskId);
         $this->_publishTaskChange();
     }
 
     /** @inheritDoc */
     public function refund(TaskInterface $task): ExtendedPromiseInterface
     {
-        if ($task instanceof LoopAwareInterface) {
-            return $this->client->rpush(static::ASYNC_QUEUE, $task);
-        } else {
-            return $this->client->rpush(static::SYNC_QUEUE, $task);
-        }
+        return $this->client
+            ->hexists(static::TASK_STORAGE, $task->getId())
+            ->then(
+                function ($result) use ($task) {
+                    if (!$result) {
+                        return reject(new TaskQueueException('Task does not exist in this queue'));
+                    } else {
+                        if ($task instanceof LoopAwareInterface) {
+                            $promise = $this->client->rpush(static::ASYNC_QUEUE, $task->getId());
+                        } else {
+                            $promise = $this->client->rpush(static::SYNC_QUEUE, $task->getId());
+                        }
+
+                        return $promise->then(
+                            function ($value) {
+                                $this->_publishTaskChange();
+
+                                return $value;
+                            }
+                        );
+
+                    }
+                }
+            );
     }
 
     /** @inheritDoc */
@@ -318,10 +342,9 @@ class RedisTaskQueue extends AbstractTaskQueue
     public function close(): ExtendedPromiseInterface
     {
         $this->client->end();
-        $prom = $this->subClient->unsubscribe(static::TASK_CHANGE_CHANNEL);
-        $this->subClient->end();
+        $this->subClient->close();
 
-        return $prom;
+        return resolve();
     }
 
     /** @inheritDoc */
@@ -347,7 +370,7 @@ class RedisTaskQueue extends AbstractTaskQueue
         );
     }
 
-    private function _count()
+    protected function _count()
     {
         return all(
             [
@@ -384,7 +407,7 @@ class RedisTaskQueue extends AbstractTaskQueue
     }
 
     /** reports other instances to trigger _count basically */
-    private function _publishTaskChange()
+    protected function _publishTaskChange()
     {
         $this->client->publish(static::TASK_CHANGE_CHANNEL);
     }

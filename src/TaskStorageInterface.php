@@ -44,6 +44,15 @@ interface TaskStorageInterface
     public function insert(TaskInterface $task): PromiseInterface;
 
     /**
+     * Mark task as cancelled
+     *
+     * @param TaskInterface $task
+     *
+     * @return PromiseInterface
+     */
+    public function cancel(TaskInterface $task): PromiseInterface;
+
+    /**
      * Delete the given task from this storage
      *
      * @param string $taskId

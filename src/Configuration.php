@@ -48,7 +48,7 @@ class Configuration
     }
 
     /**
-     * Set minimum processes that will be spawned in pool. Defaults to 0.
+     * Set minimum processes that will be spawned in pool. Defaults to 1.
      *
      * @param int $minProcesses
      */

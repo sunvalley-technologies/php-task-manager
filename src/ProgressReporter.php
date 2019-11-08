@@ -64,6 +64,21 @@ final class ProgressReporter extends EventEmitter
     }
 
     /**
+     * Generate reporter in CANCELLED status.
+     *
+     * @param TaskInterface $task
+     *
+     * @return static
+     */
+    public static function generateCancelledReporter(TaskInterface $task): self
+    {
+        $self         = new self($task);
+        $self->status = TaskStatus::CANCELLED();
+
+        return $self;
+    }
+
+    /**
      * Get progress message for this task
      *
      * @return string

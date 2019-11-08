@@ -83,6 +83,7 @@ class TaskManager extends EventEmitter
 
         $this->pool = new Pool($processCollection, $loop, $options);
         $this->setIdleQueueTimer();
+        $queue->start();
     }
 
     protected function setIdleQueueTimer()
