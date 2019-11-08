@@ -4,7 +4,7 @@ namespace SunValley\TaskManager;
 
 use Evenement\EventEmitter;
 
-class ProgressReporter extends EventEmitter
+final class ProgressReporter extends EventEmitter
 {
 
     /** @var string */
@@ -46,6 +46,21 @@ class ProgressReporter extends EventEmitter
     {
         $this->task   = $task;
         $this->status = TaskStatus::PROCESSING();
+    }
+
+    /**
+     * Generate reporter in WAITING status.
+     *
+     * @param TaskInterface $task
+     *
+     * @return static
+     */
+    public static function generateWaitingReporter(TaskInterface $task): self
+    {
+        $self         = new self($task);
+        $self->status = TaskStatus::WAITING();
+
+        return $self;
     }
 
     /**
@@ -138,7 +153,7 @@ class ProgressReporter extends EventEmitter
         $this->completion = $this->completionTarget;
         !$this->merging && $this->counter++;
 
-        if ($previousStatus === TaskStatus::PROCESSING()) {
+        if ($previousStatus == TaskStatus::PROCESSING()) {
             $this->emit('done', [$this]);
         }
     }
@@ -159,7 +174,7 @@ class ProgressReporter extends EventEmitter
         $this->message  = $message ?? $this->message;
         !$this->merging && $this->counter++;
 
-        if ($previousStatus === TaskStatus::PROCESSING()) {
+        if ($previousStatus == TaskStatus::PROCESSING()) {
             $this->emit('failed', [$this]);
         }
     }
@@ -211,7 +226,7 @@ class ProgressReporter extends EventEmitter
         }
 
         !$this->merging && $this->counter++;
-        $this->status === TaskStatus::PROCESSING() && $this->emit('change', [$this]);
+        $this->status == TaskStatus::PROCESSING() && $this->emit('change', [$this]);
     }
 
     /**
@@ -248,6 +263,20 @@ class ProgressReporter extends EventEmitter
             }
             $this->merging = false;
         }
+    }
+
+    public function __sleep()
+    {
+        return [
+            'message',
+            'error',
+            'completion',
+            'completionTarget',
+            'status',
+            'task',
+            'result',
+            'counter',
+        ];
     }
 
     public function __clone()

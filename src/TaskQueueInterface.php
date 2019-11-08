@@ -17,26 +17,33 @@ interface TaskQueueInterface
     public function getLoop(): LoopInterface;
 
     /**
-     * Add the given task to this queue
+     * Get the task storage interface. May be NULL if no task storage is defined.
+     *
+     * @return TaskStorageInterface|null
+     */
+    public function getTaskStorage(): ?TaskStorageInterface;
+
+    /**
+     * Add the given task to this queue. If a task storage is set, also calls to insert the task to storage when task
+     * is accepted successfully.
      *
      * @param TaskInterface $task
      *
      * @return ExtendedPromiseInterface Should return a promise for result of the action. Promise should be resolved
      *                                  when task is submitted to queue with no value while if it fails it should be
      *                                  rejected.
-     * @throws Exception\TaskQueueException
      */
     public function enqueue(TaskInterface $task): ExtendedPromiseInterface;
 
     /**
-     * Add the given task to this queue using the queues remote interface.
+     * Add the given task to this queue using the queues remote interface. If a task storage is set, also calls to
+     * insert the task to storage when task is accepted successfully.
      *
      * @param TaskInterface $task
      *
      * @return ExtendedPromiseInterface Should return a promise for result of the action. Promise should be resolved
      *                                  when task is submitted to queue with no value while if it fails it should be
      *                                  rejected.
-     * @throws Exception\TaskQueueException
      */
     public function enqueueRemote(TaskInterface $task): ExtendedPromiseInterface;
 

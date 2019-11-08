@@ -13,6 +13,7 @@ use SunValley\TaskManager\LoopAwareInterface;
 use SunValley\TaskManager\Stats;
 use SunValley\TaskManager\TaskInterface;
 use SunValley\TaskManager\TaskQueueInterface;
+use SunValley\TaskManager\TaskStorageInterface;
 use function React\Promise\all;
 use function React\Promise\reject;
 use function React\Promise\resolve;
@@ -30,7 +31,7 @@ use function React\Promise\resolve;
  *
  * @package SunValley\TaskManager\TaskQueue
  */
-class RedisTaskQueue implements TaskQueueInterface
+class RedisTaskQueue extends AbstractTaskQueue
 {
 
     protected const ASYNC_QUEUE = 'php_task_manager_async_queue';
@@ -38,9 +39,6 @@ class RedisTaskQueue implements TaskQueueInterface
     protected const TASK_CHANGE_CHANNEL = 'php_task_manager_submit_channel';
     protected const TASK_STORAGE = 'php_task_manager_storage';
     protected const CANCEL_SET = 'php_task_manager_cancellations';
-
-    /** @var LoopInterface */
-    protected $loop;
 
     /** @var RedisClient */
     protected $client;
@@ -63,9 +61,9 @@ class RedisTaskQueue implements TaskQueueInterface
     /** @var bool */
     protected $lastDequeueCheckIsAsync = false;
 
-    public function __construct(LoopInterface $loop, string $redisUri)
+    public function __construct(string $redisUri, LoopInterface $loop, ?TaskStorageInterface $storage = null)
     {
-        $this->loop      = $loop;
+        parent::__construct($loop, $storage);
         $redisFactory    = new RedisFactory($loop);
         $this->client    = $redisFactory->createLazyClient($redisUri);
         $this->subClient = $redisFactory->createLazyClient($redisUri);
@@ -102,6 +100,7 @@ class RedisTaskQueue implements TaskQueueInterface
 
                         return $promise->then(
                             function () use ($task) {
+                                $this->taskStorage !== null && $this->taskStorage->insert($task);
                                 $this->_publishTaskChange();
 
                                 return resolve();
@@ -263,7 +262,7 @@ class RedisTaskQueue implements TaskQueueInterface
                 }
             );
     }
-    
+
     /** @inheritDoc */
     public function cancelRemote(TaskInterface $task): ExtendedPromiseInterface
     {

@@ -8,11 +8,10 @@ use SunValley\TaskManager\Exception\TaskQueueException;
 use SunValley\TaskManager\LoopAwareInterface;
 use SunValley\TaskManager\Stats;
 use SunValley\TaskManager\TaskInterface;
-use SunValley\TaskManager\TaskQueueInterface;
 use function React\Promise\reject;
 use function React\Promise\resolve;
 
-class InMemoryTaskQueue implements TaskQueueInterface
+class InMemoryTaskQueue extends AbstractTaskQueue
 {
 
     /** @var TaskInterface[] */
@@ -30,16 +29,6 @@ class InMemoryTaskQueue implements TaskQueueInterface
     /** @var callable */
     private $onAvailableCallback;
 
-    /**
-     * InMemoryTaskQueue constructor.
-     *
-     * @param LoopInterface $loop
-     */
-    public function __construct(LoopInterface $loop)
-    {
-        $this->loop = $loop;
-    }
-
     /** @inheritDoc */
     public function getLoop(): LoopInterface
     {
@@ -54,11 +43,12 @@ class InMemoryTaskQueue implements TaskQueueInterface
         }
 
         $this->queue[$task->getId()] = $task;
+        $this->taskStorage !== null && $this->taskStorage->insert($task);
         $this->onAvailableCallback !== null && $this->getLoop()->futureTick($this->onAvailableCallback);
 
         return resolve();
     }
-    
+
     /** @inheritDoc */
     public function enqueueRemote(TaskInterface $task): ExtendedPromiseInterface
     {
@@ -86,7 +76,7 @@ class InMemoryTaskQueue implements TaskQueueInterface
         if ($task !== null) {
             return resolve($task);
         }
-        
+
         return reject();
     }
 
@@ -105,7 +95,7 @@ class InMemoryTaskQueue implements TaskQueueInterface
 
         return resolve();
     }
-    
+
     /** @inheritDoc */
     public function cancelRemote(TaskInterface $task): ExtendedPromiseInterface
     {

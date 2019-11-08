@@ -9,12 +9,18 @@ use Eloquent\Enumeration\AbstractEnumeration;
  * Class TaskStatus indicates task statuses that can be used by tasks while processing a task
  *
  * @package SunValley\TaskManager
+ * @method static TaskStatus WAITING()
  * @method static TaskStatus PROCESSING()
  * @method static TaskStatus FAILED()
  * @method static TaskStatus COMPLETED()
  */
 class TaskStatus extends AbstractEnumeration
 {
+
+    /**
+     * Indicates a task is processing
+     */
+    const WAITING = 'Waiting';
 
     /**
      * Indicates a task is processing
@@ -30,5 +36,5 @@ class TaskStatus extends AbstractEnumeration
      * Indicates a task is completed
      */
     const COMPLETED = 'Completed';
-    
+
 }

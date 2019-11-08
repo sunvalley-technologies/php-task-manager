@@ -45,18 +45,27 @@ class TaskManager extends EventEmitter
     /** @var bool */
     protected $idleQueueTimer = true;
 
+    /** @var TaskStorageInterface|null */
+    private $storage;
+
     /**
      * TaskManager constructor.
      *
-     * @param LoopInterface      $loop
-     * @param TaskQueueInterface $queue
-     * @param Configuration      $configuration
+     * @param LoopInterface             $loop
+     * @param TaskQueueInterface        $queue
+     * @param Configuration             $configuration
+     * @param TaskStorageInterface|null $storage
      */
-    public function __construct(LoopInterface $loop, TaskQueueInterface $queue, Configuration $configuration)
-    {
+    public function __construct(
+        LoopInterface $loop,
+        TaskQueueInterface $queue,
+        Configuration $configuration,
+        ?TaskStorageInterface $storage = null
+    ) {
         $this->loop          = $loop;
         $this->queue         = $queue;
         $this->configuration = $configuration;
+        $this->storage       = $storage;
         $this->queue->onAvailableTask(\Closure::fromCallable([$this, 'checkQueue']));
 
         // Setup process collection
@@ -122,7 +131,7 @@ class TaskManager extends EventEmitter
                 if ($exception instanceof TaskQueueRetryException) {
                     $this->checkQueue();
                 }
-                
+
                 // TODO: Report problem somewhere ?
             }
         )->done(
@@ -138,11 +147,6 @@ class TaskManager extends EventEmitter
 
     protected function handleTask(TaskInterface $task)
     {
-        if (isset($this->watchingTasks[$task->getId()])) {
-            // skip already watched tasks although should not be happening
-            return;
-        }
-
         $progressReporter = new ProgressReporter($task);
         $progressReporter->on(
             'change',
@@ -150,6 +154,7 @@ class TaskManager extends EventEmitter
                 $task = $reporter->getTask();
 
                 $reporter = clone $reporter;
+                $this->storage !== null && $this->storage->update($reporter);
                 $this->emit('task-progress-' . $task->getId(), [$reporter]);
                 $this->emit('task-progress', [$reporter]);
             }
@@ -161,6 +166,7 @@ class TaskManager extends EventEmitter
                 $this->queue->complete($task);
 
                 $reporter = clone $reporter;
+                $this->storage !== null && $this->storage->update($reporter);
                 $this->emit('task-completed-' . $task->getId(), [$reporter]);
                 $this->emit('task-completed', [$reporter]);
 
@@ -174,6 +180,7 @@ class TaskManager extends EventEmitter
                 $this->queue->fail($task);
 
                 $reporter = clone $reporter;
+                $this->storage !== null && $this->storage->update($reporter);
                 $this->emit('task-failed-' . $task->getId(), [$reporter]);
                 $this->emit('task-failed', [$reporter]);
 
