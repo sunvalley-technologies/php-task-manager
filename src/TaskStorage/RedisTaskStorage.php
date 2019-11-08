@@ -20,13 +20,13 @@ class RedisTaskStorage implements TaskStorageInterface
 {
 
     /** @var LoopInterface */
-    private $loop;
+    protected $loop;
 
     /** @var string */
-    private $key;
+    protected $key;
 
     /** @var RedisClient */
-    private $client;
+    protected $client;
 
     /**
      * RedisTaskStorage constructor.
@@ -46,7 +46,7 @@ class RedisTaskStorage implements TaskStorageInterface
     /** @inheritDoc */
     public function findById(string $taskId): PromiseInterface
     {
-        return $this->hget($this->key, $taskId)->then(
+        return $this->client->hget($this->key, $taskId)->then(
             function ($value) {
                 if ($value !== null) {
                     $reporter = unserialize($value);
