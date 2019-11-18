@@ -89,12 +89,18 @@ class PoolWorker extends Worker
         return $this->messenger
             ->rpc(RpcFactory::rpc('submit-task', ['task' => serialize($task)]))
             ->otherwise(
-                function () use ($task) {
+                function ($error) use ($task, $reporter) {
                     if (!$task instanceof LoopAwareInterface) {
                         $this->busy = false;
                     }
 
                     unset($this->tasks[$task->getId()]);
+                    
+                    if ($error instanceof \Throwable || is_scalar($error)) {
+                        $reporter->failTask((string)$error);
+                    } else {
+                        $reporter->failTask('Internal Error!');
+                    }
                 }
             );
     }
