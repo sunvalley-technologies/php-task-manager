@@ -205,6 +205,26 @@ final class ProgressReporter extends EventEmitter
     }
 
     /**
+     * If the task is failed
+     * 
+     * @return bool
+     */
+    public function isFailed(): bool
+    {
+        return $this->getStatus() == TaskStatus::FAILED;
+    }
+
+    /**
+     * If the task is completed successfully
+     *
+     * @return bool
+     */
+    public function isCompleted(): bool
+    {
+        return $this->getStatus() == TaskStatus::COMPLETED;
+    }
+
+    /**
      * Get related task
      *
      * @return TaskInterface
