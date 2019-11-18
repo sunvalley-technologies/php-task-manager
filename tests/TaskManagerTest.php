@@ -27,11 +27,12 @@ class TaskManagerTest extends TestCase
         $configuration->setMaxProcesses(3);
         $configuration->setTtl(1);
 
-        $storage        = $this->createMock(TaskStorageInterface::class);
+        $storage = $this->createMock(TaskStorageInterface::class);
         $storage->expects($this->atLeastOnce())->method('update');
         $taskManager = new TaskManager($loop, $queue, $configuration, $storage);
         $task1       = $this->buildAsyncTask();
         $task2       = $this->buildAsyncTask();
+        $task3       = $this->buildAsyncTask();
 
         $caught          = [];
         $taskCompletedFn = function (TaskInterface $task) use (&$caught, $taskManager, $loop) {
@@ -49,6 +50,13 @@ class TaskManagerTest extends TestCase
         $queue->enqueue($task1);
         $queue->enqueue($task2);
         $this->assertEquals(2, $queue->info()[Stats::CURRENT_TASKS]);
+        $taskManager->submitTask($task3)->then(
+            function (ProgressReporter $reporter) use (&$caught, $loop) {
+                $caught[$reporter->getTask()->getId()] = $reporter->getResult();
+            }
+        );
+
+        $this->assertEquals(3, $queue->info()[Stats::CURRENT_TASKS]);
 
         $loop->addPeriodicTimer(
             .6,
@@ -59,21 +67,21 @@ class TaskManagerTest extends TestCase
                 }
             }
         );
-        
+
         $loop->run();
 
         $this->assertEquals($task1->getOptions()['return'], $caught[$task1->getId()]);
         $this->assertEquals($task2->getOptions()['return'], $caught[$task2->getId()]);
+        $this->assertEquals($task3->getOptions()['return'], $caught[$task3->getId()]);
 
         $taskManager->terminate();
         $loop->run();
 
         $stats = $taskManager->stats();
         $this->assertEquals(0, $stats[Stats::_GROUP_QUEUE][Stats::CURRENT_TASKS]);
-        $this->assertEquals(2, $stats[Stats::_GROUP_POOL][Stats::COMPLETED_TASKS]);
+        $this->assertEquals(3, $stats[Stats::_GROUP_POOL][Stats::COMPLETED_TASKS]);
     }
-
-
+    
     protected function buildSyncTask()
     {
         return new MultiplyTask(uniqid(), ['number1' => mt_rand(), 'number2' => mt_rand()]);

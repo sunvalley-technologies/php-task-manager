@@ -218,8 +218,10 @@ final class ProcessFactory
         LoopInterface $loop,
         array $options
     ) {
+        $waitTimer = null;
+
         return (new Promise\Promise(
-            function ($resolve, $reject) use ($process, $server, $loop, $options) {
+            function ($resolve, $reject) use ($process, $server, $loop, $options, &$waitTimer) {
                 $server->on(
                     'connection',
                     function (ConnectionInterface $connection) use (
@@ -263,12 +265,29 @@ final class ProcessFactory
                 );
 
                 $process->start($loop);
+                $waitTimer = $loop->addPeriodicTimer(
+                    self::INTERVAL,
+                    function ($timer) use ($loop, $process, $server, $reject) {
+                        if (!$process->isRunning()) {
+                            $loop->cancelTimer($timer);
+
+                            $exitCode = $process->getExitCode();
+                            if ($exitCode > 0) {
+                                // premature ending
+                                $server->close();
+
+                                $reject(new \RuntimeException('Failed launching process'));
+                            }
+                        }
+                    }
+                );
             }, function () use ($server, $process) {
             $server->close();
             $process->terminate();
         }
         ))->then(
-            function (Messenger $messenger) use ($loop, $process) {
+            function (Messenger $messenger) use ($loop, $process, $waitTimer) {
+                $loop->cancelTimer($waitTimer);
                 $loop->addPeriodicTimer(
                     self::INTERVAL,
                     function ($timer) use ($messenger, $loop, $process) {

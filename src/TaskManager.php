@@ -222,18 +222,18 @@ class TaskManager extends EventEmitter
             }
         );
         try {
-            $this->queue->enqueue($task)->done(
-                function () use ($deferred, $task) {
-                    foreach (['task-completed-' . $task->getId(), 'task-failed-' . $task->getId()] as $event) {
-                        $this->once(
-                            $event,
-                            function (ProgressReporter $reporter) use ($deferred) {
-                                $deferred->resolve($reporter);
-                            }
-                        );
+            foreach (['task-completed-' . $task->getId(), 'task-failed-' . $task->getId()] as $event) {
+                $this->once(
+                    $event,
+                    function (ProgressReporter $reporter) use ($deferred) {
+                        $deferred->resolve($reporter);
                     }
-                },
-                function (\Throwable $error) use ($deferred) {
+                );
+            }
+
+            $this->queue->enqueue($task)->otherwise(
+                function (\Throwable $error) use ($task, $deferred) {
+                    $this->clearTask($task);
                     $deferred->reject($error);
                 }
             );
