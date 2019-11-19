@@ -101,4 +101,10 @@ class RedisTaskStorage implements TaskStorageInterface
     {
         return $this->client->hdel($this->key, $taskId);
     }
+
+    /** @inheritDoc */
+    public function getLoop(): LoopInterface
+    {
+        return $this->loop;
+    }
 }

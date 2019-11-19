@@ -18,9 +18,13 @@ class Client
     /** @var TaskQueueInterface */
     private $queue;
 
-    public function __construct(TaskQueueInterface $queue)
+    /** @var TaskStorageInterface */
+    private $storage;
+
+    public function __construct(TaskQueueInterface $queue, ?TaskStorageInterface $storage = null)
     {
-        $this->queue = $queue;
+        $this->queue   = $queue;
+        $this->storage = $storage;
     }
 
     /**
@@ -69,6 +73,38 @@ class Client
     public function cancelTaskSync(TaskInterface $task)
     {
         await($this->cancelTask($task), $this->queue->getLoop());
+    }
+
+    /**
+     * Check a task status that is stored in the storage. Requires a storage or throws an exception
+     *
+     * @param string $taskId
+     *
+     * @return PromiseInterface<ProgressReporter> Returns a promise that resolves with ProgressReporter instance that
+     *                                            is stored in the task storage
+     * @throws \RuntimeException Thrown when no storage is detected
+     */
+    public function checkTaskStatus(string $taskId): PromiseInterface
+    {
+        if (!$this->storage) {
+            throw new \RuntimeException('No storage is defined');
+        }
+
+        return $this->storage->findById($taskId);
+    }
+
+    /**
+     * Check a task status that is stored in the storage. Requires a storage or throws an exception.
+     *
+     * @param string $taskId
+     *
+     * @return ProgressReporter Returns a promise that resolves with ProgressReporter instance that is stored in the
+     *                          task storage
+     * @throws \RuntimeException Thrown when no storage is detected
+     */
+    public function checkTaskStatusSync(string $taskId): ProgressReporter
+    {
+        return await($this->checkTaskStatus($taskId), $this->storage->getLoop());
     }
 
 }

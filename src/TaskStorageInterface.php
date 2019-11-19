@@ -4,11 +4,19 @@
 namespace SunValley\TaskManager;
 
 
+use React\EventLoop\LoopInterface;
 use React\Promise\PromiseInterface;
 
 interface TaskStorageInterface
 {
 
+    /**
+     * Get the loop for task queue
+     *
+     * @return LoopInterface
+     */
+    public function getLoop(): LoopInterface;
+    
     /**
      * Find and return the task from storage by its identifier and returns a promise for the result
      *
