@@ -1,0 +1,29 @@
+language: php
+
+php:
+    - 7.2
+    - 7.3
+    - 7.4
+
+matrix:
+    fast_finish: true
+    include:
+        - php: 7.2
+          env: DEPENDENCIES="symfony/options-resolver:^3"
+        - php: 7.2
+          env: DEPENDENCIES="symfony/options-resolver:^4"
+
+sudo: false
+
+cache:
+    directories:
+        - $HOME/.composer/cache
+
+before_install:
+    - echo "memory_limit=4G" >> ~/.phpenv/versions/$(phpenv version-name)/etc/conf.d/travis.ini
+    - if [ "$DEPENDENCIES" != "" ]; then composer require --no-update $DEPENDENCIES; fi;
+
+install: composer update --prefer-dist --no-interaction
+
+script:
+    - ./vendor/bin/phpunit --coverage-text
