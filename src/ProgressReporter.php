@@ -211,7 +211,7 @@ final class ProgressReporter extends EventEmitter
      */
     public function isFailed(): bool
     {
-        return $this->getStatus() == TaskStatus::FAILED;
+        return $this->getStatus() == TaskStatus::FAILED();
     }
 
     /**
@@ -221,7 +221,7 @@ final class ProgressReporter extends EventEmitter
      */
     public function isCompleted(): bool
     {
-        return $this->getStatus() == TaskStatus::COMPLETED;
+        return $this->getStatus() == TaskStatus::COMPLETED();
     }
 
     /**
