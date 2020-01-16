@@ -13,6 +13,8 @@ composer require sunvalley-technologies/php-task-manager
 
 ## Usage
 
+### Task Manager
+
 This library provides a manager that handles child processes and delegation of tasks to them and also provides 
 an interface for tasks to be defined and passed to these children from different contexts.
 
@@ -69,6 +71,12 @@ If desired, progress information can be sent by calling `setMessage`, `setComple
 information. Calling these methods from a child informs manager and also manager informs task storage to update information if necessary.
  
 For more examples, check the integration tests in this library.
+
+### Service Manager
+
+ServiceManager provides a way to run a tasks like services. Each task is expected to be long running task and if it fails, it is restarted according to given restart policy.
+
+A sample can be found in the `\SunValley\TaskManager\Tests\ServiceManagerTest`
 
 ## Framework Integration
 
