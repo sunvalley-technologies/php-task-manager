@@ -49,7 +49,7 @@ class ServiceTask extends AbstractAsyncTask implements ServiceTaskInterface
     /**
      * @inheritDoc
      */
-    public function terminate(): void
+    public function terminateChild(): void
     {
         $this->socket->close();
         $this->taskResolver->resolve();
@@ -58,5 +58,13 @@ class ServiceTask extends AbstractAsyncTask implements ServiceTaskInterface
     public function handleRequest(ServerRequestInterface $request)
     {
         return new Response(200, ['Content-Type' => 'text/plain'], $this->getOptions()['return']);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function terminateMain(): void
+    {
+        
     }
 }

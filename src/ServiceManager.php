@@ -220,7 +220,16 @@ class ServiceManager extends EventEmitter
                             $this->clearTask($reporter->getTask());
                         }
                     );
-                    $this->tasks[$reporter->getTask()->getId()]['process'] = $process;
+                    $task                                   = $reporter->getTask();
+                    if ($task instanceof LoopAwareInterface) {
+                        $task->setLoop($this->loop);
+                    }
+
+                    if ($task instanceof MessengerAwareServiceTaskInterface) {
+                        $task->handleMainMessenger($messenger);
+                    }
+                    
+                    $this->tasks[$task->getId()]['process'] = $process;
 
                     return $worker->submitTask($reporter);
                 }
@@ -252,11 +261,13 @@ class ServiceManager extends EventEmitter
 
     }
 
-    protected function clearTask(TaskInterface $task)
+    protected function clearTask(ServiceTaskInterface $task)
     {
         $this->tasks[$task->getId()]['process'] = null;
         $this->tasks[$task->getId()]['worker']  = null;
         $this->tasks[$task->getId()]['spawn']   = false;
+        
+        $task->terminateMain();
     }
 
     protected function buildWorker(Messenger $messenger)

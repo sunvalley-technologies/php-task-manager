@@ -46,7 +46,7 @@ class Process extends EventEmitter implements ChildInterface
             function () {
                 foreach ($this->tasks as $task) {
                     if ($task instanceof ServiceTaskInterface) {
-                        $task->terminate();
+                        $task->terminateChild();
                     }
                 }
             }
@@ -84,6 +84,10 @@ class Process extends EventEmitter implements ChildInterface
 
         if ($task instanceof LoopAwareInterface) {
             $task->setLoop($this->loop);
+        }
+        
+        if ($task instanceof MessengerAwareServiceTaskInterface) {
+            $task->handleChildMessenger($messenger);
         }
 
         $progressReporter = new ProgressReporter($task);
