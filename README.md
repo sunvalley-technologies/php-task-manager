@@ -1,5 +1,7 @@
 # PHP Task Manager
 
+[![Build Status](https://travis-ci.org/sunvalley-technologies/php-task-manager.svg?branch=master)](https://travis-ci.org/sunvalley-technologies/php-task-manager)
+
 A task manager that helps delegating work to background be it for HTTP requests or event loops.
 
 This documentation is mostly introductory only. Majority of the classes, interfaces and methods of this library is documented
