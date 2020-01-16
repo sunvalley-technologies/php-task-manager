@@ -37,68 +37,74 @@ class ServiceManagerTest extends TestCase
         $return3 = null;
         $error3  = null;
         $errorG  = null;
-        all(
-            [
-                $promise1,
-                $promise2,
-            ]
-        )->then(
-            function () use (&$error2, &$return2, &$return1, $port2, &$error1, $port1, $client) {
-                $promise1 = $client->get('http://127.0.0.1:' . $port1)->then(
-                    function (ResponseInterface $response) use (&$return1) {
-                        $return1 = (string)$response->getBody();
-                    },
-                    function ($e) use (&$error1) {
-                        $error1 = $e;
+        $manager->start()
+                ->then(
+                    function () use ($promise2, $promise1) {
+                        return all(
+                            [
+                                $promise1,
+                                $promise2,
+                            ]
+                        );
+                    }
+                )
+                ->then(
+                    function () use (&$error2, &$return2, &$return1, $port2, &$error1, $port1, $client) {
+                        $promise1 = $client->get('http://127.0.0.1:' . $port1)->then(
+                            function (ResponseInterface $response) use (&$return1) {
+                                $return1 = (string)$response->getBody();
+                            },
+                            function ($e) use (&$error1) {
+                                $error1 = $e;
+                            }
+                        );
+
+                        $promise2 = $client->get('http://127.0.0.1:' . $port2)->then(
+                            function (ResponseInterface $response) use (&$return2) {
+                                $return2 = (string)$response->getBody();
+                            },
+                            function ($e) use (&$error2) {
+                                $error2 = $e;
+                            }
+                        );
+
+                        return all(
+                            [
+                                $promise1,
+                                $promise2,
+                            ]
+                        );
+                    }
+                )
+                ->then(
+                    function () use ($sayByeTask) {
+                        return $sayByeTask->setExternalOutput('forced-output');
+                    }
+                )
+                ->then(
+                    function () use (&$error3, &$return3, $port2, $client) {
+                        return $client->get('http://127.0.0.1:' . $port2)->then(
+                            function (ResponseInterface $response) use (&$return3) {
+                                $return3 = (string)$response->getBody();
+                            },
+                            function ($e) use (&$error3) {
+                                $error3 = $e;
+                            }
+                        );
+                    }
+                )
+                ->then(
+                    function ($v) use ($manager) {
+                        //$loop->stop();
+                        $manager->terminate();
+                    }
+                )
+                ->otherwise(
+                    function ($e) use (&$errorG, $loop) {
+                        $errorG = $e;
+                        $loop->stop();
                     }
                 );
-
-                $promise2 = $client->get('http://127.0.0.1:' . $port2)->then(
-                    function (ResponseInterface $response) use (&$return2) {
-                        $return2 = (string)$response->getBody();
-                    },
-                    function ($e) use (&$error2) {
-                        $error2 = $e;
-                    }
-                );
-
-                return all(
-                    [
-                        $promise1,
-                        $promise2,
-                    ]
-                );
-            }
-        )
-         ->then(
-             function () use ($sayByeTask) {
-                 return $sayByeTask->setExternalOutput('forced-output');
-             }
-         )
-         ->then(
-             function () use (&$error3, &$return3, $port2, $client) {
-                 return $client->get('http://127.0.0.1:' . $port2)->then(
-                     function (ResponseInterface $response) use (&$return3) {
-                         $return3 = (string)$response->getBody();
-                     },
-                     function ($e) use (&$error3) {
-                         $error3 = $e;
-                     }
-                 );
-             }
-         )
-         ->then(
-             function ($v) use ($manager) {
-                 //$loop->stop();
-                 $manager->terminate();
-             }
-         )
-         ->otherwise(
-             function ($e) use (&$errorG, $loop) {
-                 $errorG = $e;
-                 $loop->stop();
-             }
-         );
 
         $loop->run();
 

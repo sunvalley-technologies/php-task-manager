@@ -16,6 +16,8 @@ use WyriHaximus\React\ChildProcess\Messenger\Messenger;
 use WyriHaximus\React\ChildProcess\Pool\ProcessCollection\Single;
 use WyriHaximus\React\ChildProcess\Pool\ProcessCollectionInterface;
 use React\ChildProcess\Process as ReactProcess;
+use function React\Promise\all;
+use function React\Promise\resolve;
 
 /**
  * ServiceManager provides a way to run a pool of tasks like services. Given tasks are restarted according to given
@@ -77,10 +79,35 @@ class ServiceManager extends EventEmitter
             Options::FD_LISTER => FDFactory::create(),
             'childProcessPath' => $childProcessPath,
         ];
+    }
 
-        $this->checkTimer = $loop->addPeriodicTimer(
-            $this->checkInterval,
-            \Closure::fromCallable([$this, 'checkServices'])
+    /**
+     * Starts all services
+     *
+     * @return PromiseInterface<self> Resolves when all services are started
+     */
+    public function start(): PromiseInterface
+    {
+        if ($this->checkTimer === null) {
+            $this->checkTimer = $this->loop->addPeriodicTimer(
+                $this->checkInterval,
+                \Closure::fromCallable([$this, 'checkServices'])
+            );
+        }
+
+        $promises = [
+            resolve(),
+        ];
+        foreach ($this->tasks as $task) {
+            if ($task['start_defer']) {
+                $promises[] = $task['start_defer']->promise();
+            }
+        }
+
+        return all($promises)->then(
+            function () {
+                return resolve($this);
+            }
         );
     }
 
@@ -220,7 +247,7 @@ class ServiceManager extends EventEmitter
                             $this->clearTask($reporter->getTask());
                         }
                     );
-                    $task                                   = $reporter->getTask();
+                    $task = $reporter->getTask();
                     if ($task instanceof LoopAwareInterface) {
                         $task->setLoop($this->loop);
                     }
@@ -228,7 +255,7 @@ class ServiceManager extends EventEmitter
                     if ($task instanceof MessengerAwareServiceTaskInterface) {
                         $task->handleMainMessenger($messenger);
                     }
-                    
+
                     $this->tasks[$task->getId()]['process'] = $process;
 
                     return $worker->submitTask($reporter);
@@ -266,7 +293,7 @@ class ServiceManager extends EventEmitter
         $this->tasks[$task->getId()]['process'] = null;
         $this->tasks[$task->getId()]['worker']  = null;
         $this->tasks[$task->getId()]['spawn']   = false;
-        
+
         $task->terminateMain();
     }
 
