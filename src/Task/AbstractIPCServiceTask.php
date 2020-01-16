@@ -3,13 +3,15 @@
 
 namespace SunValley\TaskManager\Task;
 
+use React\EventLoop\LoopInterface;
+use React\Promise\Deferred;
 use React\Promise\PromiseInterface;
 use SunValley\TaskManager\MessengerAwareServiceTaskInterface;
 use SunValley\TaskManager\ProcessAwareMessenger;
+use SunValley\TaskManager\ProgressReporter;
 use WyriHaximus\React\ChildProcess\Messenger\Messages\Factory;
 use WyriHaximus\React\ChildProcess\Messenger\Messages\Payload;
 use WyriHaximus\React\ChildProcess\Messenger\Messenger;
-use function React\Promise\reject;
 use function React\Promise\resolve;
 
 /**
@@ -22,6 +24,9 @@ abstract class AbstractIPCServiceTask extends AbstractServiceTask implements Mes
 {
 
     private $rpcFn;
+
+    /** @var Deferred */
+    private $taskResolver;
 
     final public function handleChildMessenger(Messenger $messenger)
     {
@@ -40,6 +45,7 @@ abstract class AbstractIPCServiceTask extends AbstractServiceTask implements Mes
                         if (!$retval instanceof PromiseInterface) {
                             $retval = resolve(['data' => $retval]);
                         }
+
                         return $retval->then(
                             function () {
                                 return resolve([]);
@@ -99,4 +105,25 @@ abstract class AbstractIPCServiceTask extends AbstractServiceTask implements Mes
 
         return $env > 0;
     }
+
+    final protected function _run(LoopInterface $loop, ProgressReporter $reporter): PromiseInterface
+    {
+        $this->taskResolver = new Deferred();
+        $this->__run($loop, $reporter, $this->taskResolver);
+        return $this->taskResolver->promise();
+    }
+    
+    public function terminateChild(): void
+    {
+        $this->taskResolver->resolve();
+    }
+
+    /**
+     * Run the task
+     *
+     * @param LoopInterface    $loop
+     * @param ProgressReporter $reporter
+     * @param Deferred         $deferred Deferred to resolve to terminate the class
+     */
+    abstract protected function __run(LoopInterface $loop, ProgressReporter $reporter, Deferred $deferred): void;
 }

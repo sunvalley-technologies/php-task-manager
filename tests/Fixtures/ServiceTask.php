@@ -17,9 +17,6 @@ use function React\Promise\resolve;
 class ServiceTask extends AbstractIPCServiceTask
 {
 
-    /** @var Deferred */
-    private $taskResolver;
-
     /** @var SocketServer */
     private $socket;
 
@@ -39,13 +36,11 @@ class ServiceTask extends AbstractIPCServiceTask
         return $resolver;
     }
 
-    protected function _run(LoopInterface $loop, ProgressReporter $reporter): PromiseInterface
+    protected function __run(LoopInterface $loop, ProgressReporter $reporter, Deferred $deferred): void
     {
         $server       = new HttpServer(\Closure::fromCallable([$this, 'handleRequest']));
         $this->socket = new SocketServer('127.0.0.1:' . $this->getOptions()['http-port'], $loop);
         $server->listen($this->socket);
-
-        return ($this->taskResolver = new Deferred())->promise();
     }
 
     /**
@@ -54,7 +49,7 @@ class ServiceTask extends AbstractIPCServiceTask
     public function terminateChild(): void
     {
         $this->socket->close();
-        $this->taskResolver->resolve();
+        parent::terminateChild();
     }
 
     public function handleRequest(ServerRequestInterface $request)
