@@ -22,6 +22,7 @@ if (isset($argv[1])) {
     $arguments = $argv[1];
 }
 
+$_ENV['APP_CHILD'] = $_SERVER['APP_CHILD'] = 1; 
 $loop = LoopFactory::create();
 MessengerFactory::child($loop, ArgvEncoder::decode($arguments))->done(
     function (Messenger $messenger) use ($loop) {
