@@ -7,10 +7,13 @@ use React\EventLoop\LoopInterface;
 use React\EventLoop\TimerInterface;
 use React\Promise\Deferred;
 use React\Promise\ExtendedPromiseInterface;
+use React\Promise\PromiseInterface;
 use SunValley\TaskManager\Exception\TaskQueueRetryException;
 use WyriHaximus\FileDescriptors\Factory as FDFactory;
 use SunValley\TaskManager\PoolOptions as Options;
 use WyriHaximus\React\ChildProcess\Pool\ProcessCollection\Single;
+use function React\Promise\all;
+use function React\Promise\resolve;
 
 /**
  * Class TaskManager
@@ -46,7 +49,7 @@ class TaskManager extends EventEmitter
     protected $idleQueueTimer = true;
 
     /** @var TaskStorageInterface|null */
-    private $storage;
+    protected $storage;
 
     /**
      * TaskManager constructor.
@@ -66,24 +69,8 @@ class TaskManager extends EventEmitter
         $this->queue         = $queue;
         $this->configuration = $configuration;
         $this->storage       = $storage;
-        $this->queue->onAvailableTask(\Closure::fromCallable([$this, 'checkQueue']));
 
-        // Setup process collection
-        $processCollection = new Single(new ProcessLauncher());
-
-        // Setup options
-        /** @noinspection PhpUnhandledExceptionInspection */
-        $options = [
-            Options::MIN_SIZE             => $configuration->getMinProcesses(),
-            Options::MAX_SIZE             => $configuration->getMaxProcesses(),
-            Options::TTL                  => $configuration->getTtl(),
-            Options::FD_LISTER            => FDFactory::create(),
-            Options::MAX_JOBS_PER_PROCESS => $configuration->getMaxJobsPerProcess(),
-        ];
-
-        $this->pool = new Pool($processCollection, $loop, $options);
-        $this->setIdleQueueTimer();
-        $queue->start();
+        $this->start();
     }
 
     protected function setIdleQueueTimer()
@@ -246,11 +233,49 @@ class TaskManager extends EventEmitter
         return $deferred->promise();
     }
 
-    public function terminate()
+    public function start(): PromiseInterface
     {
+        if ($this->pool === null) {
+            // Setup process collection
+            $processCollection = new Single(new ProcessLauncher());
+
+            // Setup options
+            /** @noinspection PhpUnhandledExceptionInspection */
+            $options = [
+                Options::MIN_SIZE             => $this->configuration->getMinProcesses(),
+                Options::MAX_SIZE             => $this->configuration->getMaxProcesses(),
+                Options::TTL                  => $this->configuration->getTtl(),
+                Options::FD_LISTER            => FDFactory::create(),
+                Options::MAX_JOBS_PER_PROCESS => $this->configuration->getMaxJobsPerProcess(),
+            ];
+
+            $this->pool = new Pool($processCollection, $this->loop, $options);
+        }
+
+        if ($this->queueTimer === null) {
+            $this->setIdleQueueTimer();
+            $this->queue->start();
+            $this->queue->onAvailableTask(\Closure::fromCallable([$this, 'checkQueue']));
+        }
+
+        return resolve();
+    }
+
+    public function terminate(): PromiseInterface
+    {
+        $this->queue->onAvailableTask(
+            function () {
+            }
+        );
         $this->queueTimer !== null && $this->loop->cancelTimer($this->queueTimer);
-        $this->queue->close();
-        $this->pool->terminate();
+        $this->queueTimer = null;
+
+        return all(
+            [
+                $this->queue->close(),
+                $this->pool->terminate(),
+            ]
+        );
     }
 
     public function stats(): array
