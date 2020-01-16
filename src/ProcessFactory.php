@@ -160,7 +160,7 @@ final class ProcessFactory
                     function ($resolve, $reject) use ($connection, $options, $loop, $connectTimeout) {
                         Promise\Timer\timeout(Promise\Stream\first($connection), $connectTimeout, $loop)->then(
                             function ($chunk) use ($resolve, $reject, $connection, $options, $loop) {
-                                list($confirmation) = \explode(PHP_EOL, $chunk);
+                                [$confirmation] = \explode(PHP_EOL, $chunk);
                                 if ($confirmation === 'syn') {
                                     $connection->write('ack' . PHP_EOL);
                                     $resolve(new Messenger($connection, $options));
@@ -182,25 +182,14 @@ final class ProcessFactory
             function (Messenger $messenger) use ($loop, $termiteCallable) {
                 if ($termiteCallable === null) {
                     $termiteCallable = function ($payload, $messenger) use ($loop) {
-                        $loop->addTimer(
-                            self::TERMINATE_TIMEOUT,
-                            [
-                                $loop,
-                                'stop',
-                            ]
-                        );
+                        $loop->addTimer(self::TERMINATE_TIMEOUT, [$loop, 'stop']);
                     };
                 }
 
                 $messenger->registerRpc(
                     Messenger::TERMINATE_RPC,
                     function (Payload $payload, Messenger $messenger) use ($termiteCallable) {
-                        $messenger->emit(
-                            'terminate',
-                            [
-                                $messenger,
-                            ]
-                        );
+                        $messenger->emit('terminate', [$messenger]);
                         $termiteCallable($payload, $messenger);
 
                         return Promise\resolve([]);
@@ -234,7 +223,7 @@ final class ProcessFactory
                     ) {
                         Promise\Stream\first($connection)->then(
                             function ($chunk) use ($options, $connection, $resolve) {
-                                list($confirmation) = \explode(PHP_EOL, $chunk);
+                                [$confirmation] = \explode(PHP_EOL, $chunk);
                                 if ($confirmation === \hash_hmac('sha512', $options['address'], $options['random'])) {
                                     $connection->write('syn' . PHP_EOL);
 
@@ -243,7 +232,7 @@ final class ProcessFactory
                             }
                         )->then(
                             function ($chunk) use ($options, $connection, $process) {
-                                list($confirmation) = \explode(PHP_EOL, $chunk);
+                                [$confirmation] = \explode(PHP_EOL, $chunk);
                                 if ($confirmation === 'ack') {
                                     return Promise\resolve(new ProcessAwareMessenger($process, $connection, $options));
                                 }
