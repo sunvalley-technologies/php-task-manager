@@ -4,19 +4,14 @@ namespace SunValley\TaskManager\Task;
 
 use React\EventLoop\LoopInterface;
 use React\Promise\PromiseInterface;
+use SunValley\TaskManager\LoopAwareTrait;
 use SunValley\TaskManager\ProgressReporter;
 use SunValley\TaskManager\TaskStatus;
 
 trait AsyncTaskTrait
 {
-
-    /** @var LoopInterface */
-    protected $loop;
-
-    public function setLoop(LoopInterface $loop): void
-    {
-        $this->loop = $loop;
-    }
+    
+    use LoopAwareTrait;
 
     public function run(ProgressReporter $progressReporter): void
     {

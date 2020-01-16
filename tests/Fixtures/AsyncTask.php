@@ -1,22 +1,16 @@
 <?php
 
-
 namespace SunValley\TaskManager\Tests\Fixtures;
-
 
 use React\EventLoop\LoopInterface;
 use React\Promise\Deferred;
 use React\Promise\PromiseInterface;
-use SunValley\TaskManager\Task\AbstractTask;
-use SunValley\TaskManager\Task\AsyncTaskTrait;
-use SunValley\TaskManager\LoopAwareInterface;
+use SunValley\TaskManager\Task\AbstractAsyncTask;
 use SunValley\TaskManager\ProgressReporter;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
-class AsyncTask extends AbstractTask implements LoopAwareInterface
+class AsyncTask extends AbstractAsyncTask
 {
-
-    use AsyncTaskTrait;
 
     function buildOptionsResolver(): OptionsResolver
     {
