@@ -10,19 +10,21 @@ use React\Promise\Deferred;
 use React\Promise\PromiseInterface;
 use React\Socket\Server as SocketServer;
 use SunValley\TaskManager\ProgressReporter;
-use SunValley\TaskManager\ServiceTaskInterface;
-use SunValley\TaskManager\Task\AbstractAsyncTask;
+use SunValley\TaskManager\Task\AbstractIPCServiceTask;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use function React\Promise\resolve;
 
-class ServiceTask extends AbstractAsyncTask implements ServiceTaskInterface
+class ServiceTask extends AbstractIPCServiceTask
 {
-
 
     /** @var Deferred */
     private $taskResolver;
 
     /** @var SocketServer */
     private $socket;
+
+    /** @var string */
+    private $externalOutput;
 
     /**
      * @inheritDoc
@@ -57,7 +59,9 @@ class ServiceTask extends AbstractAsyncTask implements ServiceTaskInterface
 
     public function handleRequest(ServerRequestInterface $request)
     {
-        return new Response(200, ['Content-Type' => 'text/plain'], $this->getOptions()['return']);
+        $return = $this->externalOutput ?? $this->getOptions()['return'];
+
+        return new Response(200, ['Content-Type' => 'text/plain'], $return);
     }
 
     /**
@@ -65,6 +69,27 @@ class ServiceTask extends AbstractAsyncTask implements ServiceTaskInterface
      */
     public function terminateMain(): void
     {
-        
+
+    }
+
+    public function setExternalOutput(string $output)
+    {
+        if ($this->isChild()) {
+            $this->externalOutput = $output;
+
+            return resolve([]);
+        } else {
+            return $this->callChildMethod('setExternalOutput', $output);
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected function getIPCMethods(): iterable
+    {
+        return [
+            'setExternalOutput' => [$this, 'setExternalOutput'],
+        ];
     }
 }

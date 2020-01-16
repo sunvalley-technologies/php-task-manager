@@ -34,6 +34,9 @@ class ServiceManagerTest extends TestCase
         $error1  = null;
         $return2 = null;
         $error2  = null;
+        $return3 = null;
+        $error3  = null;
+        $errorG  = null;
         all(
             [
                 $promise1,
@@ -68,9 +71,32 @@ class ServiceManagerTest extends TestCase
             }
         )
          ->then(
+             function () use ($sayByeTask) {
+                 return $sayByeTask->setExternalOutput('forced-output');
+             }
+         )
+         ->then(
+             function () use (&$error3, &$return3, $port2, $client) {
+                 return $client->get('http://127.0.0.1:' . $port2)->then(
+                     function (ResponseInterface $response) use (&$return3) {
+                         $return3 = (string)$response->getBody();
+                     },
+                     function ($e) use (&$error3) {
+                         $error3 = $e;
+                     }
+                 );
+             }
+         )
+         ->then(
              function ($v) use ($manager) {
                  //$loop->stop();
                  $manager->terminate();
+             }
+         )
+         ->otherwise(
+             function ($e) use (&$errorG, $loop) {
+                 $errorG = $e;
+                 $loop->stop();
              }
          );
 
@@ -78,7 +104,10 @@ class ServiceManagerTest extends TestCase
 
         $this->assertNull($error1);
         $this->assertNull($error2);
+        $this->assertNull($error3);
+        $this->assertNull($errorG);
         $this->assertEquals($sayHelloTask->getOptions()['return'], $return1);
         $this->assertEquals($sayByeTask->getOptions()['return'], $return2);
+        $this->assertEquals('forced-output', $return3);
     }
 }
