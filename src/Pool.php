@@ -55,12 +55,27 @@ class Pool extends EventEmitter
      */
     public function __construct(ProcessCollectionInterface $processCollection, LoopInterface $loop, array $options = [])
     {
-        $this->options = array_merge($this->defaultOptions, $options);
+        $this->options = $this->defaultOptions;
+        $this->setOptions($options);
+        $this->processCollection = $processCollection;
+        $this->loop              = $loop;
+    }
+
+    /**
+     * Set options.
+     *
+     * @param array $options
+     *
+     * @return $this
+     */
+    public function setOptions(array $options): self
+    {
+        $this->options = array_merge($this->options, $options);
         if ($this->options[Options::MIN_SIZE] <= 0) {
             $this->options[Options::MIN_SIZE] = 1;
         }
-        $this->processCollection = $processCollection;
-        $this->loop              = $loop;
+
+        return $this;
     }
 
     /**
@@ -171,7 +186,7 @@ class Pool extends EventEmitter
 
         return null;
     }
-    
+
     protected function spawn(): ?ExtendedPromiseInterface
     {
         $this->startingProcesses++;
@@ -284,5 +299,5 @@ class Pool extends EventEmitter
 
         return false;
     }
-    
+
 }
