@@ -106,10 +106,12 @@ class ServiceManager extends EventEmitter
      * @param ServiceTaskInterface $task
      * @param int                  $restartPolicy
      *
-     * @return $this
+     * @return PromiseInterface<ProgressReporter> Promise resolves when the task is run for the first time.
      */
-    public function addTask(ServiceTaskInterface $task, int $restartPolicy = self::RESTART_POLICY_ALWAYS): self
-    {
+    public function addTask(
+        ServiceTaskInterface $task,
+        int $restartPolicy = self::RESTART_POLICY_ALWAYS
+    ): PromiseInterface {
         if (isset($this->tasks[$task->getId()])) {
             throw new \InvalidArgumentException(
                 sprintf('Given task %s already is in this service name manager', $task->getId())
@@ -121,6 +123,7 @@ class ServiceManager extends EventEmitter
             throw new \InvalidArgumentException(sprintf('Invalid restart policy %d is given!', $restartPolicy));
         }
 
+        $deferred                    = new Deferred();
         $this->tasks[$task->getId()] = [
             'reporter'        => new ProgressReporter($task),
             'restart'         => $restartPolicy,
@@ -134,9 +137,10 @@ class ServiceManager extends EventEmitter
             'first_terminate' => 0,
             'error'           => null,
             'process'         => null,
+            'start_defer'     => $deferred,
         ];
 
-        return $this;
+        return $deferred->promise();
     }
 
     protected function checkServices(): void
@@ -146,19 +150,23 @@ class ServiceManager extends EventEmitter
             if ($task['spawn']) {
                 continue;
             }
-            // don't check if already started and restart policy is not to restart
-            if ($task['started'] > 0 && $task['restart'] > 0) {
-                continue;
-            }
 
+            // don't check if already started and restart policy is not to restart
             /** @var PoolWorker $worker */
             $worker = $task['worker'];
 
             /** @var ProgressReporter $reporter */
             $reporter = $task['reporter'];
 
-            if ($worker !== null && $worker->taskCount() === 1 && !$reporter->isCompleted() && !$reporter->isFailed()) {
-                continue;
+            if ($this->terminateDefer === null) {
+                if ($task['started'] > 0 && $task['restart'] > 0) {
+                    continue;
+                }
+
+                if ($worker !== null && $worker->taskCount() === 1 &&
+                    !$reporter->isCompleted() && !$reporter->isFailed()) {
+                    continue;
+                }
             }
 
             if ($worker !== null) {
@@ -221,6 +229,12 @@ class ServiceManager extends EventEmitter
                 function (PoolWorker $worker) use ($reporter) {
                     $this->tasks[$reporter->getTask()->getId()]['worker'] = $worker;
                     $this->tasks[$reporter->getTask()->getId()]['spawn']  = false;
+                    if ($this->tasks[$reporter->getTask()->getId()]['start_defer']) {
+                        /** @var Deferred $deferred */
+                        $deferred = $this->tasks[$reporter->getTask()->getId()]['start_defer'];
+                        $deferred->resolve($reporter);
+                    }
+                    $this->tasks[$reporter->getTask()->getId()]['start_defer'] = null;
                 }
             )
             ->otherwise(

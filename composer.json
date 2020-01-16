@@ -21,7 +21,10 @@
     "clue/block-react": "^1.3"
   },
   "require-dev": {
-    "phpunit/phpunit": "~6.0|~7.0"
+    "phpunit/phpunit": "~6.0|~7.0",
+    "react/http": "^0.8.5",
+    "clue/buzz-react": "^2.6.1",
+    "sunvalley-technologies/phpunit-callable-test-case": "^1.0"
   },
   "autoload": {
     "psr-4": {
