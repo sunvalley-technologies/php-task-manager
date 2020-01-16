@@ -21,6 +21,9 @@ class PoolWorker extends Worker
     /** @var ProcessAwareMessenger */
     protected $messenger;
 
+    /** @var bool|int */
+    protected $terminated = false;
+
     /** @var array */
     protected $options = [
         Options::TTL                  => 60,
@@ -35,6 +38,13 @@ class PoolWorker extends Worker
         parent::__construct($messenger);
 
         $messenger->registerRpc('task-report', \Closure::fromCallable([$this, 'handleProgressReport']));
+
+        $messenger->on(
+            'terminate',
+            function () {
+                $this->emit('terminate', [$this]);
+            }
+        );
     }
 
     public function setOptions(array $options)
@@ -123,4 +133,39 @@ class PoolWorker extends Worker
         return parent::isBusy() || $this->taskCount() >= $this->options[Options::MAX_JOBS_PER_PROCESS];
     }
 
+    /**
+     * If worker is terminated
+     *
+     * @return bool
+     */
+    public function isTerminated(): bool
+    {
+        return $this->terminated !== false;
+    }
+
+    /**
+     * Returns time of the terminate call
+     *
+     * @return int
+     * @throws \BadMethodCallException If process is not terminated
+     */
+    public function getTerminationTimestamp(): int
+    {
+        if (!$this->isTerminated()) {
+            throw new \BadMethodCallException('Process is not terminated!');
+        }
+
+        return $this->terminated;
+    }
+
+    public function terminate()
+    {
+        if ($this->terminated) {
+            return resolve();
+        }
+
+        $this->terminated = true;
+
+        return parent::terminate();
+    }
 }
