@@ -17,7 +17,7 @@ class PoolWorker extends Worker
 
     /** @var ProgressReporter[] */
     protected $tasks = [];
-    
+
     /** @var ProcessAwareMessenger */
     protected $messenger;
 
@@ -61,7 +61,7 @@ class PoolWorker extends Worker
      *
      * @param ProgressReporter $reporter
      *
-     * @return ExtendedPromiseInterface Resolves when task is submitted
+     * @return ExtendedPromiseInterface<self> Resolves when task is submitted and resolves with worker
      */
     public function submitTask(ProgressReporter $reporter): ExtendedPromiseInterface
     {
@@ -88,14 +88,17 @@ class PoolWorker extends Worker
 
         return $this->messenger
             ->rpc(RpcFactory::rpc('submit-task', ['task' => serialize($task)]))
-            ->otherwise(
+            ->then(
+                function () {
+                    return resolve($this);
+                },
                 function ($error) use ($task, $reporter) {
                     if (!$task instanceof LoopAwareInterface) {
                         $this->busy = false;
                     }
 
                     unset($this->tasks[$task->getId()]);
-                    
+
                     if ($error instanceof \Throwable || is_scalar($error)) {
                         $reporter->failTask((string)$error);
                     } else {
