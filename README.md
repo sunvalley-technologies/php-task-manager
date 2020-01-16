@@ -74,7 +74,7 @@ For more examples, check the integration tests in this library.
 
 ### Service Manager
 
-ServiceManager provides a way to run a tasks like services. Each task is expected to be long running task and if it fails, it is restarted according to given restart policy.
+ServiceManager provides a way to run tasks like services. Each task is expected to be long running task and if it fails, it is restarted according to given restart policy.
 
 A sample can be found in the `\SunValley\TaskManager\Tests\ServiceManagerTest`
 
