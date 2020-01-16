@@ -16,8 +16,8 @@ use function React\Promise\resolve;
 class Process extends EventEmitter implements ChildInterface
 {
 
-    /** @var int */
-    private $runningTasks = 0;
+    /** @var TaskInterface[] */
+    private $tasks = [];
 
     /**
      * @inheritDoc
@@ -41,6 +41,16 @@ class Process extends EventEmitter implements ChildInterface
     {
         $this->loop = $loop;
         $this->setupRpc($messenger);
+        $messenger->on(
+            'terminate',
+            function () {
+                foreach ($this->tasks as $task) {
+                    if ($task instanceof ServiceTaskInterface) {
+                        $task->terminate();
+                    }
+                }
+            }
+        );
     }
 
     /**
@@ -71,7 +81,7 @@ class Process extends EventEmitter implements ChildInterface
         if (!$task instanceof TaskInterface) {
             return reject(['error' => 'Internal Error! Task cannot be decoded!']);
         }
-        
+
         if ($task instanceof LoopAwareInterface) {
             $task->setLoop($this->loop);
         }
@@ -95,15 +105,14 @@ class Process extends EventEmitter implements ChildInterface
         foreach ($events as $event) {
             $progressReporter->on(
                 $event,
-                function () {
-                    $this->runningTasks--;
+                function () use ($task) {
+                    unset($this->tasks[$task->getId()]);
                 }
             );
         }
 
-        $this->runningTasks++;
+        $this->tasks[$task->getId()] = $task;
         $task->run($progressReporter);
-
 
         return [];
     }

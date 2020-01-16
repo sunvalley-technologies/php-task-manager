@@ -6,6 +6,8 @@ namespace SunValley\TaskManager;
 
 use Evenement\EventEmitter;
 use React\EventLoop\LoopInterface;
+use React\EventLoop\TimerInterface;
+use React\Promise\Deferred;
 use React\Promise\ExtendedPromiseInterface;
 use React\Promise\PromiseInterface;
 use SunValley\TaskManager\PoolOptions as Options;
@@ -45,6 +47,15 @@ class ServiceManager extends EventEmitter
     /** @var array */
     protected $processOptions;
 
+    /** @var int|float */
+    protected $checkInterval = 1;
+
+    /** @var TimerInterface */
+    protected $checkTimer;
+
+    /** @var Deferred */
+    protected $terminateDefer;
+
     /**
      * ServiceManager constructor.
      *
@@ -66,17 +77,38 @@ class ServiceManager extends EventEmitter
             Options::FD_LISTER => FDFactory::create(),
             'childProcessPath' => $childProcessPath,
         ];
+
+        $this->checkTimer = $loop->addPeriodicTimer(
+            $this->checkInterval,
+            \Closure::fromCallable([$this, 'checkServices'])
+        );
+    }
+
+    /**
+     * Terminates all services and send them termination signal.
+     *
+     * @return PromiseInterface<self> Resolves when all services and workers are terminated
+     */
+    public function terminate(): PromiseInterface
+    {
+        if ($this->terminateDefer) {
+            return $this->terminateDefer->promise();
+        }
+
+        $this->terminateDefer = new Deferred();
+
+        return $this->terminateDefer->promise();
     }
 
     /**
      * Add a task to be watched over
      *
-     * @param TaskInterface $task
-     * @param int           $restartPolicy
+     * @param ServiceTaskInterface $task
+     * @param int                  $restartPolicy
      *
      * @return $this
      */
-    public function addTask(TaskInterface $task, int $restartPolicy = self::RESTART_POLICY_ALWAYS): self
+    public function addTask(ServiceTaskInterface $task, int $restartPolicy = self::RESTART_POLICY_ALWAYS): self
     {
         if (isset($this->tasks[$task->getId()])) {
             throw new \InvalidArgumentException(
@@ -107,7 +139,7 @@ class ServiceManager extends EventEmitter
         return $this;
     }
 
-    protected function checkServices()
+    protected function checkServices(): void
     {
         foreach ($this->tasks as $task) {
             // don't check if spawning
@@ -144,7 +176,22 @@ class ServiceManager extends EventEmitter
                 continue;
             }
 
-            $this->spawn($reporter);
+            if ($this->terminateDefer === null) {
+                $this->spawn($reporter);
+            }
+        }
+
+        // check termination
+        if ($this->terminateDefer) {
+            foreach ($this->tasks as $task) {
+                if ($task['worker'] !== null) {
+                    return;
+                }
+            }
+
+            // all terminated
+            $this->loop->cancelTimer($this->checkTimer);
+            $this->terminateDefer->resolve($this);
         }
     }
 
