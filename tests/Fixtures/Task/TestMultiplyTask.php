@@ -1,12 +1,12 @@
 <?php
 
-namespace SunValley\TaskManager\Tests\Fixtures;
+namespace SunValley\TaskManager\Tests\Fixtures\Task;
 
 use SunValley\TaskManager\Task\AbstractTask;
 use SunValley\TaskManager\ProgressReporter;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
-class MultiplyTask extends AbstractTask
+class TestMultiplyTask extends AbstractTask
 {
 
     /** @inheritDoc */

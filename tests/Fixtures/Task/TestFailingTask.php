@@ -1,13 +1,13 @@
 <?php
 
 
-namespace SunValley\TaskManager\Tests\Fixtures;
+namespace SunValley\TaskManager\Tests\Fixtures\Task;
 
 use SunValley\TaskManager\ProgressReporter;
 use SunValley\TaskManager\Task\AbstractTask;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
-class FailingTask extends AbstractTask
+class TestFailingTask extends AbstractTask
 {
     /** @inheritDoc */
     function buildOptionsResolver(): OptionsResolver

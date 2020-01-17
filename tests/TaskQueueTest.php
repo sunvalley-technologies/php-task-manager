@@ -16,8 +16,8 @@ use SunValley\TaskManager\LoopAwareInterface;
 use SunValley\TaskManager\TaskQueue\InMemoryTaskQueue;
 use SunValley\TaskManager\TaskQueue\RedisTaskQueue;
 use SunValley\TaskManager\TaskStorageInterface;
-use SunValley\TaskManager\Tests\Fixtures\AsyncTask;
-use SunValley\TaskManager\Tests\Fixtures\MultiplyTask;
+use SunValley\TaskManager\Tests\Fixtures\Task\TestAsyncTask;
+use SunValley\TaskManager\Tests\Fixtures\Task\TestMultiplyTask;
 use function Clue\React\Block\await;
 use function React\Promise\resolve;
 
@@ -335,14 +335,14 @@ class TaskQueueTest extends TestCase
 
     protected function buildSyncTask()
     {
-        $task = new MultiplyTask(uniqid(), ['number1' => mt_rand(), 'number2' => mt_rand()]);
+        $task = new TestMultiplyTask(uniqid(), ['number1' => mt_rand(), 'number2' => mt_rand()]);
 
         return $task;
     }
 
     protected function buildAsyncTask()
     {
-        $task = new AsyncTask(uniqid(), ['timer' => 5, 'return' => mt_rand()]);
+        $task = new TestAsyncTask(uniqid(), ['timer' => 5, 'return' => mt_rand()]);
 
         return $task;
     }

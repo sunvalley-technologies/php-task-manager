@@ -9,8 +9,8 @@ use Psr\Http\Message\ResponseInterface;
 use React\EventLoop\Factory as LoopFactory;
 use SunValley\TaskManager\ServiceManager;
 use SunValley\TaskManager\ServiceTaskInterface;
-use SunValley\TaskManager\Tests\Fixtures\FailingServiceTask;
-use SunValley\TaskManager\Tests\Fixtures\ServiceTask;
+use SunValley\TaskManager\Tests\Fixtures\Task\TestFailingServiceTask;
+use SunValley\TaskManager\Tests\Fixtures\Task\TestServiceTask;
 use SunValley\Tests\CallableUtil\CallableTestTrait;
 use function React\Promise\all;
 
@@ -24,9 +24,9 @@ class ServiceManagerTest extends TestCase
         $manager      = new ServiceManager($loop);
         $port1        = 9832;
         $port2        = 9833;
-        $sayHelloTask = new ServiceTask('say-hello', ['http-port' => $port1, 'return' => 'Hello']);
-        $sayByeTask   = new ServiceTask('say-bye', ['http-port' => $port2, 'return' => 'Bye']);
-        $failingTask  = new FailingServiceTask('fail');
+        $sayHelloTask = new TestServiceTask('say-hello', ['http-port' => $port1, 'return' => 'Hello']);
+        $sayByeTask   = new TestServiceTask('say-bye', ['http-port' => $port2, 'return' => 'Bye']);
+        $failingTask  = new TestFailingServiceTask('fail');
         $client       = new Browser($loop);
 
         $promise1 = $manager->addTask($sayHelloTask);

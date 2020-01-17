@@ -10,8 +10,8 @@ use SunValley\TaskManager\PoolWorker;
 use SunValley\TaskManager\ProcessAwareMessenger;
 use SunValley\TaskManager\ProgressReporter;
 use SunValley\TaskManager\TaskStatus;
-use SunValley\TaskManager\Tests\Fixtures\AsyncTask;
-use SunValley\TaskManager\Tests\Fixtures\MultiplyTask;
+use SunValley\TaskManager\Tests\Fixtures\Task\TestAsyncTask;
+use SunValley\TaskManager\Tests\Fixtures\Task\TestMultiplyTask;
 use WyriHaximus\React\ChildProcess\Messenger\Messages\Payload;
 
 class PoolWorkerTest extends TestCase
@@ -99,7 +99,7 @@ class PoolWorkerTest extends TestCase
 
     protected function buildSyncTask()
     {
-        $task = new MultiplyTask(uniqid(), ['number1' => mt_rand(), 'number2' => mt_rand()]);
+        $task = new TestMultiplyTask(uniqid(), ['number1' => mt_rand(), 'number2' => mt_rand()]);
 
         return new ProgressReporter($task);
     }
@@ -127,7 +127,7 @@ class PoolWorkerTest extends TestCase
 
     protected function buildAsyncTask()
     {
-        $task = new AsyncTask(uniqid(), ['timer' => 5, 'return' => mt_rand()]);
+        $task = new TestAsyncTask(uniqid(), ['timer' => 5, 'return' => mt_rand()]);
 
         return new ProgressReporter($task);
     }

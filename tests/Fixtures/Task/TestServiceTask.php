@@ -1,20 +1,19 @@
 <?php
 
-namespace SunValley\TaskManager\Tests\Fixtures;
+namespace SunValley\TaskManager\Tests\Fixtures\Task;
 
 use Psr\Http\Message\ServerRequestInterface;
 use React\EventLoop\LoopInterface;
 use React\Http\Response;
 use React\Http\Server as HttpServer;
 use React\Promise\Deferred;
-use React\Promise\PromiseInterface;
 use React\Socket\Server as SocketServer;
 use SunValley\TaskManager\ProgressReporter;
 use SunValley\TaskManager\Task\AbstractIPCServiceTask;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use function React\Promise\resolve;
 
-class ServiceTask extends AbstractIPCServiceTask
+class TestServiceTask extends AbstractIPCServiceTask
 {
 
     /** @var SocketServer */

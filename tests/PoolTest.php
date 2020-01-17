@@ -14,8 +14,8 @@ use SunValley\TaskManager\PoolOptions;
 use SunValley\TaskManager\ProcessAwareMessenger;
 use SunValley\TaskManager\ProgressReporter;
 use SunValley\TaskManager\Stats;
-use SunValley\TaskManager\Tests\Fixtures\AsyncTask;
-use SunValley\TaskManager\Tests\Fixtures\MultiplyTask;
+use SunValley\TaskManager\Tests\Fixtures\Task\TestAsyncTask;
+use SunValley\TaskManager\Tests\Fixtures\Task\TestMultiplyTask;
 use WyriHaximus\React\ChildProcess\Pool\ProcessCollectionInterface;
 use function React\Promise\resolve;
 
@@ -27,7 +27,7 @@ class PoolTest extends TestCase
         $loop = LoopFactory::create();
         /** @var Pool $pool */
         /** @var AnyInvokedCount $spy */
-        list($pool, $spy) = $this->generatePool($loop, [PoolOptions::MAX_JOBS_PER_PROCESS => 2, PoolOptions::TTL => 1]);
+        [$pool, $spy] = $this->generatePool($loop, [PoolOptions::MAX_JOBS_PER_PROCESS => 2, PoolOptions::TTL => 1]);
         $pool->ping();
         $loop->run();
 
@@ -134,14 +134,14 @@ class PoolTest extends TestCase
 
     protected function buildSyncTask()
     {
-        $task = new MultiplyTask(uniqid(), ['number1' => mt_rand(), 'number2' => mt_rand()]);
+        $task = new TestMultiplyTask(uniqid(), ['number1' => mt_rand(), 'number2' => mt_rand()]);
 
         return new ProgressReporter($task);
     }
 
     protected function buildAsyncTask()
     {
-        $task = new AsyncTask(uniqid(), ['timer' => 0.5, 'return' => mt_rand()]);
+        $task = new TestAsyncTask(uniqid(), ['timer' => 0.5, 'return' => mt_rand()]);
 
         return new ProgressReporter($task);
     }

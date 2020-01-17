@@ -12,9 +12,9 @@ use SunValley\TaskManager\TaskInterface;
 use SunValley\TaskManager\TaskManager;
 use SunValley\TaskManager\TaskQueue\InMemoryTaskQueue;
 use SunValley\TaskManager\TaskStorageInterface;
-use SunValley\TaskManager\Tests\Fixtures\AsyncTask;
-use SunValley\TaskManager\Tests\Fixtures\FailingTask;
-use SunValley\TaskManager\Tests\Fixtures\MultiplyTask;
+use SunValley\TaskManager\Tests\Fixtures\Task\TestAsyncTask;
+use SunValley\TaskManager\Tests\Fixtures\Task\TestFailingTask;
+use SunValley\TaskManager\Tests\Fixtures\Task\TestMultiplyTask;
 
 class TaskManagerTest extends TestCase
 {
@@ -104,7 +104,7 @@ class TaskManagerTest extends TestCase
     /**
      * @param string $error
      *
-     * @return FailingTask
+     * @return TestFailingTask
      */
     protected function buildFailingTask(string $error = null)
     {
@@ -113,16 +113,16 @@ class TaskManagerTest extends TestCase
             $options = ['error' => $error];
         }
 
-        return new FailingTask(uniqid(), $options);
+        return new TestFailingTask(uniqid(), $options);
     }
 
     protected function buildSyncTask()
     {
-        return new MultiplyTask(uniqid(), ['number1' => mt_rand(), 'number2' => mt_rand()]);
+        return new TestMultiplyTask(uniqid(), ['number1' => mt_rand(), 'number2' => mt_rand()]);
     }
 
     protected function buildAsyncTask()
     {
-        return new AsyncTask(uniqid(), ['timer' => 0.5, 'return' => mt_rand()]);
+        return new TestAsyncTask(uniqid(), ['timer' => 0.5, 'return' => mt_rand()]);
     }
 }

@@ -33,7 +33,7 @@ class ProcessTest extends TestCase
             }
         );
         $options = ['number1' => 5, 'number2' => 10];
-        $task    = new Fixtures\MultiplyTask(uniqid('task', true), $options);
+        $task    = new SunValley\TaskManager\Tests\Fixtures\Task\TestMultiplyTask(uniqid('task', true), $options);
         $messenger->callRpc('submit-task', new Payload(['task' => serialize($task)]));
         $loop->run();
 
@@ -51,9 +51,9 @@ class ProcessTest extends TestCase
         $loop      = LoopFactory::create();
         /** @var TaskInterface[] $tasks */
         $tasks        = [
-            'id1' => new Fixtures\AsyncTask('id1', ['timer' => mt_rand(10, 50) / 100, 'return' => 'ab1']),
-            'id2' => new Fixtures\AsyncTask('id2', ['timer' => mt_rand(10, 50) / 100, 'return' => 'cd2']),
-            'id3' => new Fixtures\AsyncTask('id3', ['timer' => mt_rand(10, 50) / 100, 'return' => 'x3']),
+            'id1' => new SunValley\TaskManager\Tests\Fixtures\Task\TestAsyncTask('id1', ['timer' => mt_rand(10, 50) / 100, 'return' => 'ab1']),
+            'id2' => new SunValley\TaskManager\Tests\Fixtures\Task\TestAsyncTask('id2', ['timer' => mt_rand(10, 50) / 100, 'return' => 'cd2']),
+            'id3' => new SunValley\TaskManager\Tests\Fixtures\Task\TestAsyncTask('id3', ['timer' => mt_rand(10, 50) / 100, 'return' => 'x3']),
         ];
         $foundResults = [];
 

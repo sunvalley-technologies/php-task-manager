@@ -12,7 +12,7 @@ use React\Promise\ExtendedPromiseInterface;
 use SunValley\TaskManager\ProgressReporter;
 use SunValley\TaskManager\TaskStatus;
 use SunValley\TaskManager\TaskStorage\RedisTaskStorage;
-use SunValley\TaskManager\Tests\Fixtures\MultiplyTask;
+use SunValley\TaskManager\Tests\Fixtures\Task\TestMultiplyTask;
 use function Clue\React\Block\await;
 use function React\Promise\resolve;
 
@@ -138,7 +138,7 @@ class TaskStorageTest extends TestCase
 
     protected function buildTask()
     {
-        $task = new MultiplyTask(uniqid(), ['number1' => mt_rand(), 'number2' => mt_rand()]);
+        $task = new TestMultiplyTask(uniqid(), ['number1' => mt_rand(), 'number2' => mt_rand()]);
 
         return $task;
     }

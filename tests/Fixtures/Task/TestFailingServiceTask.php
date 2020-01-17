@@ -1,6 +1,6 @@
 <?php
 
-namespace SunValley\TaskManager\Tests\Fixtures;
+namespace SunValley\TaskManager\Tests\Fixtures\Task;
 
 use React\EventLoop\LoopInterface;
 use React\Promise\PromiseInterface;
@@ -8,7 +8,7 @@ use SunValley\TaskManager\ProgressReporter;
 use SunValley\TaskManager\Task\AbstractServiceTask;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
-class FailingServiceTask extends AbstractServiceTask
+class TestFailingServiceTask extends AbstractServiceTask
 {
 
     /**
