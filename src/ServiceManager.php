@@ -279,12 +279,8 @@ class ServiceManager extends EventEmitter
      */
     public function getTaskById(string $taskId): ServiceTaskInterface
     {
-        if (!isset($this->status[$taskId])) {
-            throw new InvalidArgumentException(sprintf('Given task ID `%s` does not exist', $taskId));
-        }
-
         /** @var ServiceTaskInterface $task */
-        $task = $this->status[$taskId]->getReporter()->getTask();
+        $task = $this->getStatusById($taskId)->getReporter()->getTask();
 
         return $task;
     }
@@ -302,6 +298,15 @@ class ServiceManager extends EventEmitter
             },
             $this->status
         );
+    }
+
+    public function getStatusById(string $taskId): ServiceStatusInterface
+    {
+        if (!isset($this->status[$taskId])) {
+            throw new InvalidArgumentException(sprintf('Given task ID `%s` does not exist', $taskId));
+        }
+
+        return $this->status[$taskId];
     }
 
 }
