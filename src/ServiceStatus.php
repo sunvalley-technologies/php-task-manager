@@ -8,7 +8,7 @@ use React\Promise\PromiseInterface;
 use RuntimeException;
 
 /** @internal */
-class ServiceStatus
+class ServiceStatus implements ServiceStatusInterface
 {
 
     /** @var ProgressReporter */
