@@ -8,6 +8,8 @@ use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ResponseInterface;
 use React\EventLoop\Factory as LoopFactory;
 use SunValley\TaskManager\ServiceManager;
+use SunValley\TaskManager\ServiceTaskInterface;
+use SunValley\TaskManager\Tests\Fixtures\FailingServiceTask;
 use SunValley\TaskManager\Tests\Fixtures\ServiceTask;
 use SunValley\Tests\CallableUtil\CallableTestTrait;
 use function React\Promise\all;
@@ -24,12 +26,20 @@ class ServiceManagerTest extends TestCase
         $port2        = 9833;
         $sayHelloTask = new ServiceTask('say-hello', ['http-port' => $port1, 'return' => 'Hello']);
         $sayByeTask   = new ServiceTask('say-bye', ['http-port' => $port2, 'return' => 'Bye']);
+        $failingTask  = new FailingServiceTask('fail');
         $client       = new Browser($loop);
 
         $promise1 = $manager->addTask($sayHelloTask);
         $promise1->then($this->expectCallableOnce());
         $promise2 = $manager->addTask($sayByeTask);
         $promise2->then($this->expectCallableOnce());
+        $failPromise = $manager->addTask($failingTask);
+        $failPromise->otherwise($this->expectCallableOnce());
+
+        $this->assertContainsOnlyInstancesOf(ServiceTaskInterface::class, $manager->getTasks());
+        $this->assertCount(3, $manager->getTasks());
+        $this->assertEquals($failingTask, $manager->getTaskById($failingTask->getId()));
+
         $return1 = null;
         $error1  = null;
         $return2 = null;

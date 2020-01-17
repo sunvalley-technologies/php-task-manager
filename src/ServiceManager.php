@@ -84,7 +84,8 @@ class ServiceManager extends EventEmitter
     /**
      * Starts all services
      *
-     * @return PromiseInterface<self> Resolves when all services are started
+     * @return PromiseInterface<self> Resolves when all services are started (once). This promise never rejects. Check
+     *                                individual addTask promises.
      */
     public function start(): PromiseInterface
     {
@@ -95,20 +96,21 @@ class ServiceManager extends EventEmitter
             );
         }
 
-        $promises = [
-            resolve(),
-        ];
+        $promises = [];
         foreach ($this->tasks as $task) {
             if ($task['start_defer']) {
                 $promises[] = $task['start_defer']->promise();
             }
         }
 
-        return all($promises)->then(
-            function () {
-                return resolve($this);
+        $defer = new Deferred();
+        all($promises)->always(
+            function () use ($defer) {
+                $defer->resolve($this);
             }
         );
+
+        return $defer->promise();
     }
 
     /**
@@ -133,7 +135,8 @@ class ServiceManager extends EventEmitter
      * @param ServiceTaskInterface $task
      * @param int                  $restartPolicy
      *
-     * @return PromiseInterface<ProgressReporter> Promise resolves when the task is run for the first time.
+     * @return PromiseInterface<ProgressReporter> Promise resolves when the task is run for the first time or rejected
+     *                                            if it fails for the first time.
      */
     public function addTask(
         ServiceTaskInterface $task,
@@ -232,7 +235,9 @@ class ServiceManager extends EventEmitter
 
     protected function spawn(ProgressReporter $reporter): PromiseInterface
     {
-        $this->tasks[$reporter->getTask()->getId()]['spawn'] = true;
+        $reporter                                               = new ProgressReporter($reporter->getTask());
+        $this->tasks[$reporter->getTask()->getId()]['spawn']    = true;
+        $this->tasks[$reporter->getTask()->getId()]['reporter'] = $reporter;
         $this->tasks[$reporter->getTask()->getId()]['started']++;
         $current = $this->processCollection->current();
         $promise = $this->spawnAndGetMessenger($current);
@@ -293,6 +298,19 @@ class ServiceManager extends EventEmitter
         $this->tasks[$task->getId()]['process'] = null;
         $this->tasks[$task->getId()]['worker']  = null;
         $this->tasks[$task->getId()]['spawn']   = false;
+        if (isset($this->tasks[$task->getId()]['start_defer'])) {
+            /** @var ProgressReporter $reporter */
+            $reporter = $this->tasks[$task->getId()]['reporter'];
+            /** @var Deferred $deferred */
+            $deferred = $this->tasks[$task->getId()]['start_defer'];
+            if ($reporter->isFailed()) {
+                $deferred->reject(new \RuntimeException($reporter->getError()));
+            } else {
+                $deferred->reject(new \RuntimeException('Process terminated'));
+            }
+
+            $this->tasks[$task->getId()]['start_defer'] = null;
+        }
 
         $task->terminateMain();
     }
@@ -338,7 +356,7 @@ class ServiceManager extends EventEmitter
             throw new \InvalidArgumentException(sprintf('Given task ID `%s` does not exist', $taskId));
         }
 
-        return $this->tasks[$taskId];
+        return $this->tasks[$taskId]['reporter']->getTask();
     }
 
     /**
