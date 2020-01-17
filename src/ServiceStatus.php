@@ -35,6 +35,9 @@ class ServiceStatus implements ServiceStatusInterface
     /** @var Deferred */
     private $startDefer;
 
+    /** @var Deferred */
+    private $stopDefer;
+
     /** @var bool */
     private $stopCall = false;
 
@@ -48,11 +51,12 @@ class ServiceStatus implements ServiceStatusInterface
         $this->task       = $task;
         $this->reporter   = new ProgressReporter($this->task);
         $this->startDefer = new Deferred();
+        $this->stopDefer  = new Deferred();
     }
 
     public function generateProgressReporter(): ProgressReporter
     {
-        $this->stopCall   = false;
+        $this->stopCall = false;
         $this->startedTimes++;
         $this->spawning = true;
 
@@ -79,7 +83,7 @@ class ServiceStatus implements ServiceStatusInterface
         $this->spawning = false;
         $this->startDefer->resolve($this->reporter);
         $this->startDefer = new Deferred();
-        $this->worker = $worker;
+        $this->worker     = $worker;
 
         return $this;
     }
@@ -117,17 +121,32 @@ class ServiceStatus implements ServiceStatusInterface
             return;
         }
 
+
+        $reason = null;
+        if ($this->spawning) {
+            if ($this->reporter->isFailed()) {
+                $reason = new RuntimeException($this->reporter->getError());
+            } else {
+                $reason = new RuntimeException('Process terminated');
+            }
+        }
         $this->stopCall = true;
         $this->process  = null;
         $this->worker   = null;
         $this->spawning = false;
-
-        if ($this->reporter->isFailed()) {
-            $this->startDefer->reject(new RuntimeException($this->reporter->getError()));
-        } else {
-            $this->startDefer->reject(new RuntimeException('Process terminated'));
+        $this->stopDefer->resolve($this->reporter);
+        $this->stopDefer = new Deferred();
+        if ($reason) {
+            $this->startDefer->reject($reason);
+            $this->startDefer = new Deferred();
         }
+    }
 
-        $this->startDefer = new Deferred();
+    /**
+     * @inheritDoc
+     */
+    public function getStopPromise(): PromiseInterface
+    {
+        return $this->stopDefer->promise();
     }
 }

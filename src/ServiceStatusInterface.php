@@ -35,13 +35,18 @@ interface ServiceStatusInterface
     public function getStartedTimes(): int;
 
     /**
-     * Get a promise which resolves according to the status of the service when promise is received:
+     * Get a promise which resolves whenever the service is started. This promise can get rejected with the exception
+     * as reason if a failure occurs.
      *
-     * - If service is not started, returned promise resolves when service is started or rejected if service fails to
-     * start.
-     * - If service is started, returned promise will never be resolved and will always be rejected.
-     *
-     * @return PromiseInterface
+     * @return PromiseInterface<ProgressReporter>
      */
     public function getStartPromise(): PromiseInterface;
+
+    /**
+     * Get a promise which resolves whenever the service is stop, including termination. This promise never gets a
+     * rejection.
+     *
+     * @return PromiseInterface<ProgressReporter>
+     */
+    public function getStopPromise(): PromiseInterface;
 }

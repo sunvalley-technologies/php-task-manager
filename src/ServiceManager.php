@@ -300,6 +300,25 @@ class ServiceManager extends EventEmitter
         );
     }
 
+    /**
+     * Get status information
+     * 
+     * @param TaskInterface $task
+     *
+     * @return ServiceStatusInterface
+     */
+    public function getStatus(TaskInterface $task): ServiceStatusInterface
+    {
+        return $this->getStatusById($task->getId());
+    }
+
+    /**
+     * Get status information by id
+     * 
+     * @param string $taskId
+     *
+     * @return ServiceStatusInterface
+     */
     public function getStatusById(string $taskId): ServiceStatusInterface
     {
         if (!isset($this->status[$taskId])) {

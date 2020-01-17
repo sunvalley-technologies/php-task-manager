@@ -34,7 +34,9 @@ class ServiceManagerTest extends TestCase
         $promise2 = $manager->addTask($sayByeTask);
         $promise2->then($this->expectCallableOnce());
         $failPromise = $manager->addTask($failingTask);
-        $failPromise->otherwise($this->expectCallableOnce());
+        $failPromise->then($this->expectCallableOnce(), $this->expectCallableNever());
+        $manager->getStatus($failingTask)->getStopPromise()->then($this->expectCallableOnce());
+
 
         $this->assertContainsOnlyInstancesOf(ServiceTaskInterface::class, $manager->getTasks());
         $this->assertCount(3, $manager->getTasks());
