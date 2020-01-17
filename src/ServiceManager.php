@@ -13,6 +13,8 @@ use React\Promise\Deferred;
 use React\Promise\ExtendedPromiseInterface;
 use React\Promise\PromiseInterface;
 use SunValley\TaskManager\PoolOptions as Options;
+use SunValley\TaskManager\Service\ServiceOptions;
+use SunValley\TaskManager\Service\ServiceStatus;
 use WyriHaximus\FileDescriptors\Factory as FDFactory;
 use WyriHaximus\React\ChildProcess\Messenger\Messenger;
 use WyriHaximus\React\ChildProcess\Pool\ProcessCollection\Single;

@@ -1,6 +1,8 @@
 <?php
 
-namespace SunValley\TaskManager;
+namespace SunValley\TaskManager\Service;
+
+use SunValley\TaskManager\ServiceManager;
 
 class ServiceOptions
 {

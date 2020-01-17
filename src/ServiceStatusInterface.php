@@ -3,6 +3,7 @@
 namespace SunValley\TaskManager;
 
 use React\Promise\PromiseInterface;
+use SunValley\TaskManager\Service\ServiceOptions;
 
 interface ServiceStatusInterface
 {

@@ -1,11 +1,15 @@
 <?php
 
-namespace SunValley\TaskManager;
+namespace SunValley\TaskManager\Service;
 
 use React\ChildProcess\Process as ReactProcess;
 use React\Promise\Deferred;
 use React\Promise\PromiseInterface;
 use RuntimeException;
+use SunValley\TaskManager\PoolWorker;
+use SunValley\TaskManager\ProgressReporter;
+use SunValley\TaskManager\ServiceStatusInterface;
+use SunValley\TaskManager\ServiceTaskInterface;
 
 /** @internal */
 class ServiceStatus implements ServiceStatusInterface
