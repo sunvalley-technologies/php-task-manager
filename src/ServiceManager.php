@@ -324,4 +324,36 @@ class ServiceManager extends EventEmitter
         );
     }
 
+    /**
+     * Returns a task by its id.
+     *
+     * @param string $taskId
+     *
+     * @return ServiceTaskInterface
+     * @throws \InvalidArgumentException When task does not exist
+     */
+    public function getTaskById(string $taskId): ServiceTaskInterface
+    {
+        if (!isset($this->tasks[$taskId])) {
+            throw new \InvalidArgumentException(sprintf('Given task ID `%s` does not exist', $taskId));
+        }
+
+        return $this->tasks[$taskId];
+    }
+
+    /**
+     * Get tasks
+     *
+     * @return iterable|ServiceTaskInterface[]
+     */
+    public function getTasks(): iterable
+    {
+        return array_map(
+            function (ProgressReporter $reporter) {
+                return $reporter->getTask();
+            },
+            array_column($this->tasks, 'reporter')
+        );
+    }
+
 }
