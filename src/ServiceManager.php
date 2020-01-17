@@ -4,7 +4,9 @@
 namespace SunValley\TaskManager;
 
 
+use Closure;
 use Evenement\EventEmitter;
+use InvalidArgumentException;
 use React\EventLoop\LoopInterface;
 use React\EventLoop\TimerInterface;
 use React\Promise\Deferred;
@@ -15,7 +17,7 @@ use WyriHaximus\FileDescriptors\Factory as FDFactory;
 use WyriHaximus\React\ChildProcess\Messenger\Messenger;
 use WyriHaximus\React\ChildProcess\Pool\ProcessCollection\Single;
 use WyriHaximus\React\ChildProcess\Pool\ProcessCollectionInterface;
-use React\ChildProcess\Process as ReactProcess;
+use function escapeshellarg;
 use function React\Promise\all;
 use function React\Promise\resolve;
 
@@ -43,8 +45,8 @@ class ServiceManager extends EventEmitter
     /** @var ProcessCollectionInterface */
     protected $processCollection;
 
-    /** @var array */
-    protected $tasks = [];
+    /** @var ServiceStatus[] */
+    protected $status = [];
 
     /** @var array */
     protected $processOptions;
@@ -71,7 +73,7 @@ class ServiceManager extends EventEmitter
         $this->processCollection = new Single(new ProcessLauncher());
 
         $sp               = DIRECTORY_SEPARATOR;
-        $childProcessPath = \escapeshellarg(
+        $childProcessPath = escapeshellarg(
             __DIR__ . $sp . '..' . $sp . 'bin' . $sp . 'php-task-manager-service.php'
         );
         /** @noinspection PhpUnhandledExceptionInspection */
@@ -92,15 +94,13 @@ class ServiceManager extends EventEmitter
         if ($this->checkTimer === null) {
             $this->checkTimer = $this->loop->addPeriodicTimer(
                 $this->checkInterval,
-                \Closure::fromCallable([$this, 'checkServices'])
+                Closure::fromCallable([$this, 'checkServices'])
             );
         }
 
         $promises = [];
-        foreach ($this->tasks as $task) {
-            if ($task['start_defer']) {
-                $promises[] = $task['start_defer']->promise();
-            }
+        foreach ($this->status as $status) {
+            $promises[] = $status->getStartPromise();
         }
 
         $defer = new Deferred();
@@ -133,63 +133,40 @@ class ServiceManager extends EventEmitter
      * Add a task to be watched over
      *
      * @param ServiceTaskInterface $task
-     * @param int                  $restartPolicy
+     * @param ServiceOptions|null  $options
      *
      * @return PromiseInterface<ProgressReporter> Promise resolves when the task is run for the first time or rejected
      *                                            if it fails for the first time.
      */
-    public function addTask(
-        ServiceTaskInterface $task,
-        int $restartPolicy = self::RESTART_POLICY_ALWAYS
-    ): PromiseInterface {
-        if (isset($this->tasks[$task->getId()])) {
-            throw new \InvalidArgumentException(
+    public function addTask(ServiceTaskInterface $task, ?ServiceOptions $options = null): PromiseInterface
+    {
+        if (isset($this->status[$task->getId()])) {
+            throw new InvalidArgumentException(
                 sprintf('Given task %s already is in this service name manager', $task->getId())
             );
         }
 
-        $policies = [static::RESTART_POLICY_ALWAYS, static::RESTART_POLICY_NO, static::RESTART_POLICY_NO_ERROR];
-        if (!in_array($restartPolicy, $policies, true)) {
-            throw new \InvalidArgumentException(sprintf('Invalid restart policy %d is given!', $restartPolicy));
-        }
+        $status                       = new ServiceStatus($task, $options);
+        $this->status[$task->getId()] = $status;
 
-        $deferred                    = new Deferred();
-        $this->tasks[$task->getId()] = [
-            'reporter'        => new ProgressReporter($task),
-            'restart'         => $restartPolicy,
-            'options'         => [
-                'terminate_timeout'      => 5,
-                'terminate_timeout_hard' => 10,
-            ],
-            'worker'          => null,
-            'spawn'           => false,
-            'started'         => 0,
-            'first_terminate' => 0,
-            'error'           => null,
-            'process'         => null,
-            'start_defer'     => $deferred,
-        ];
-
-        return $deferred->promise();
+        return $status->getStartPromise();
     }
 
     protected function checkServices(): void
     {
-        foreach ($this->tasks as $task) {
+        foreach ($this->status as $status) {
             // don't check if spawning
-            if ($task['spawn']) {
+            if ($status->isSpawning()) {
                 continue;
             }
 
+            $worker   = $status->getWorker();
+            $reporter = $status->getReporter();
+
             // don't check if already started and restart policy is not to restart
-            /** @var PoolWorker $worker */
-            $worker = $task['worker'];
-
-            /** @var ProgressReporter $reporter */
-            $reporter = $task['reporter'];
-
+            $options = $status->getOptions();
             if ($this->terminateDefer === null) {
-                if ($task['started'] > 0 && $task['restart'] > 0) {
+                if ($status->getStartedTimes() > 0 && $options->getRestartPolicy() > 0) {
                     continue;
                 }
 
@@ -204,10 +181,9 @@ class ServiceManager extends EventEmitter
                     $worker->terminate();
                 } else {
                     $passed = time() - $worker->getTerminationTimestamp();
-                    if ($passed > $task['options']['terminate_timeout']) {
-                        /** @var ReactProcess $process */
-                        $process = $task['process'];
-                        $process->terminate($passed > $task['options']['terminate_timeout_hard'] ? 9 : 15);
+                    if ($passed > $options->getTerminateTimeout()) {
+                        $process = $status->getProcess();
+                        $process->terminate($passed > $options->getTerminateTimeoutHard() ? 9 : 15);
                     }
                 }
 
@@ -215,14 +191,14 @@ class ServiceManager extends EventEmitter
             }
 
             if ($this->terminateDefer === null) {
-                $this->spawn($reporter);
+                $this->spawn($status);
             }
         }
 
         // check termination
         if ($this->terminateDefer) {
-            foreach ($this->tasks as $task) {
-                if ($task['worker'] !== null) {
+            foreach ($this->status as $status) {
+                if ($status->getWorker() !== null) {
                     return;
                 }
             }
@@ -233,86 +209,37 @@ class ServiceManager extends EventEmitter
         }
     }
 
-    protected function spawn(ProgressReporter $reporter): PromiseInterface
+    protected function spawn(ServiceStatus $status): void
     {
-        $reporter                                               = new ProgressReporter($reporter->getTask());
-        $this->tasks[$reporter->getTask()->getId()]['spawn']    = true;
-        $this->tasks[$reporter->getTask()->getId()]['reporter'] = $reporter;
-        $this->tasks[$reporter->getTask()->getId()]['started']++;
-        $current = $this->processCollection->current();
-        $promise = $this->spawnAndGetMessenger($current);
-        $promise
-            ->then(
-                function (ProcessAwareMessenger $messenger) use ($reporter, &$worker) {
-                    $worker  = $this->buildWorker($messenger);
-                    $process = $messenger->getProcess();
-                    $process->on(
-                        'exit',
-                        function () use ($reporter) {
-                            $this->clearTask($reporter->getTask());
-                        }
-                    );
-                    $task = $reporter->getTask();
-                    if ($task instanceof LoopAwareInterface) {
-                        $task->setLoop($this->loop);
-                    }
+        $reporter = $status->generateProgressReporter();
+        $current  = $this->processCollection->current();
+        $this->spawnAndGetMessenger($current)
+             ->then(
+                 function (ProcessAwareMessenger $messenger) use ($reporter, $status) {
+                     $worker  = $this->buildWorker($messenger);
+                     $process = $messenger->getProcess();
+                     $process->on('exit', Closure::fromCallable([$status, 'stopTask']));
+                     $task = $reporter->getTask();
+                     if ($task instanceof LoopAwareInterface) {
+                         $task->setLoop($this->loop);
+                     }
 
-                    if ($task instanceof MessengerAwareServiceTaskInterface) {
-                        $task->handleMainMessenger($messenger);
-                    }
+                     if ($task instanceof MessengerAwareServiceTaskInterface) {
+                         $task->handleMainMessenger($messenger);
+                     }
 
-                    $this->tasks[$task->getId()]['process'] = $process;
+                     $status->setProcess($process);
 
-                    return $worker->submitTask($reporter);
-                }
-            )
-            ->then(
-                function (PoolWorker $worker) use ($reporter) {
-                    $this->tasks[$reporter->getTask()->getId()]['worker'] = $worker;
-                    $this->tasks[$reporter->getTask()->getId()]['spawn']  = false;
-                    if ($this->tasks[$reporter->getTask()->getId()]['start_defer']) {
-                        /** @var Deferred $deferred */
-                        $deferred = $this->tasks[$reporter->getTask()->getId()]['start_defer'];
-                        $deferred->resolve($reporter);
-                    }
-                    $this->tasks[$reporter->getTask()->getId()]['start_defer'] = null;
-                }
-            )
-            ->otherwise(
-                function () use ($reporter) {
-                    $this->clearTask($reporter->getTask());
-                }
-            );
+                     return $worker->submitTask($reporter);
+                 }
+             )
+             ->then(Closure::fromCallable([$status, 'setWorker']))
+             ->otherwise(Closure::fromCallable([$status, 'stopTask']));
 
         $this->processCollection->next();
         if (!$this->processCollection->valid()) {
             $this->processCollection->rewind();
         }
-
-        return $promise;
-
-    }
-
-    protected function clearTask(ServiceTaskInterface $task)
-    {
-        $this->tasks[$task->getId()]['process'] = null;
-        $this->tasks[$task->getId()]['worker']  = null;
-        $this->tasks[$task->getId()]['spawn']   = false;
-        if (isset($this->tasks[$task->getId()]['start_defer'])) {
-            /** @var ProgressReporter $reporter */
-            $reporter = $this->tasks[$task->getId()]['reporter'];
-            /** @var Deferred $deferred */
-            $deferred = $this->tasks[$task->getId()]['start_defer'];
-            if ($reporter->isFailed()) {
-                $deferred->reject(new \RuntimeException($reporter->getError()));
-            } else {
-                $deferred->reject(new \RuntimeException('Process terminated'));
-            }
-
-            $this->tasks[$task->getId()]['start_defer'] = null;
-        }
-
-        $task->terminateMain();
     }
 
     protected function buildWorker(Messenger $messenger)
@@ -322,7 +249,7 @@ class ServiceManager extends EventEmitter
         $worker->on(
             'done',
             function (PoolWorker $worker) {
-                $worker->terminate()->then(\Closure::fromCallable([$this, 'checkServices']));
+                $worker->terminate()->then(Closure::fromCallable([$this, 'checkServices']));
             }
         );
 
@@ -334,7 +261,7 @@ class ServiceManager extends EventEmitter
         return $current($this->loop, $this->processOptions)->then(
             function ($timeoutOrMessenger) use ($current) {
                 if ($timeoutOrMessenger instanceof Messenger) {
-                    return \React\Promise\resolve($timeoutOrMessenger);
+                    return resolve($timeoutOrMessenger);
                 }
 
                 return $this->spawnAndGetMessenger($current);
@@ -348,15 +275,18 @@ class ServiceManager extends EventEmitter
      * @param string $taskId
      *
      * @return ServiceTaskInterface
-     * @throws \InvalidArgumentException When task does not exist
+     * @throws InvalidArgumentException When task does not exist
      */
     public function getTaskById(string $taskId): ServiceTaskInterface
     {
-        if (!isset($this->tasks[$taskId])) {
-            throw new \InvalidArgumentException(sprintf('Given task ID `%s` does not exist', $taskId));
+        if (!isset($this->status[$taskId])) {
+            throw new InvalidArgumentException(sprintf('Given task ID `%s` does not exist', $taskId));
         }
 
-        return $this->tasks[$taskId]['reporter']->getTask();
+        /** @var ServiceTaskInterface $task */
+        $task = $this->status[$taskId]->getReporter()->getTask();
+
+        return $task;
     }
 
     /**
@@ -367,11 +297,12 @@ class ServiceManager extends EventEmitter
     public function getTasks(): iterable
     {
         return array_map(
-            function (ProgressReporter $reporter) {
-                return $reporter->getTask();
+            function (ServiceStatus $status) {
+                return $status->getReporter()->getTask();
             },
-            array_column($this->tasks, 'reporter')
+            $this->status
         );
     }
 
 }
+
