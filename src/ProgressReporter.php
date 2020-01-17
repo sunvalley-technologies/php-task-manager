@@ -3,6 +3,7 @@
 namespace SunValley\TaskManager;
 
 use Evenement\EventEmitter;
+use function RingCentral\Psr7\str;
 
 final class ProgressReporter extends EventEmitter
 {
@@ -186,6 +187,7 @@ final class ProgressReporter extends EventEmitter
         $this->status   = TaskStatus::FAILED();
         $this->result   = null;
         $this->error    = $error ?? $this->error;
+        $this->error    = (string)$error;
         $this->message  = $message ?? $this->message;
         !$this->merging && $this->counter++;
 
@@ -206,7 +208,7 @@ final class ProgressReporter extends EventEmitter
 
     /**
      * If the task is failed
-     * 
+     *
      * @return bool
      */
     public function isFailed(): bool

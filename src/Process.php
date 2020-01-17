@@ -85,7 +85,7 @@ class Process extends EventEmitter implements ChildInterface
         if ($task instanceof LoopAwareInterface) {
             $task->setLoop($this->loop);
         }
-        
+
         if ($task instanceof MessengerAwareServiceTaskInterface) {
             $task->handleChildMessenger($messenger);
         }
@@ -116,7 +116,11 @@ class Process extends EventEmitter implements ChildInterface
         }
 
         $this->tasks[$task->getId()] = $task;
-        $task->run($progressReporter);
+        try {
+            $task->run($progressReporter);
+        } catch (\Throwable $e) {
+            $progressReporter->failTask((string)$e, $e->getMessage());
+        }
 
         return [];
     }

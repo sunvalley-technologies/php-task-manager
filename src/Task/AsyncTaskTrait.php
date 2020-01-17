@@ -29,7 +29,7 @@ trait AsyncTaskTrait
                 }
 
                 if ($error instanceof \Throwable) {
-                    $progressReporter->failTask($error->getTraceAsString(), $error->getMessage());
+                    $progressReporter->failTask((string)$error, $error->getMessage());
 
                     return;
                 } elseif (!is_scalar($error)) {
