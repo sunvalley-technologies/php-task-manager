@@ -82,7 +82,7 @@ abstract class AbstractIPCServiceTask extends AbstractServiceTask implements Mes
 
         $data = serialize($data);
 
-        return ($this->rpcFn)($name, $data, $id);
+        return call_user_func($this->rpcFn, $name, $data, $id);
     }
 
     /**

@@ -10,6 +10,8 @@ use React\Socket\ConnectionInterface;
 use SunValley\TaskManager\ProgressReporter;
 use SunValley\TaskManager\TaskInterface;
 use SunValley\TaskManager\Process;
+use SunValley\TaskManager\Tests\Fixtures\Task\TestAsyncTask;
+use SunValley\TaskManager\Tests\Fixtures\Task\TestMultiplyTask;
 use WyriHaximus\React\ChildProcess\Messenger\Messages\Payload;
 use WyriHaximus\React\ChildProcess\Messenger\Messenger;
 
@@ -25,15 +27,16 @@ class ProcessTest extends TestCase
         $messenger   = new Messenger($connection->reveal());
         $loop        = LoopFactory::create();
         $foundResult = null;
-        Process::create($messenger, $loop)->on(
-            'done',
-            function (ProgressReporter $reporter) use (&$foundResult, $loop) {
-                $foundResult = $reporter->getResult();
-                $loop->stop();
-            }
-        );
+        Process::create($messenger, $loop)
+               ->on(
+                   'done',
+                   function (ProgressReporter $reporter) use (&$foundResult, $loop) {
+                       $foundResult = $reporter->getResult();
+                       $loop->stop();
+                   }
+               );
         $options = ['number1' => 5, 'number2' => 10];
-        $task    = new SunValley\TaskManager\Tests\Fixtures\Task\TestMultiplyTask(uniqid('task', true), $options);
+        $task    = new TestMultiplyTask(uniqid('task', true), $options);
         $messenger->callRpc('submit-task', new Payload(['task' => serialize($task)]));
         $loop->run();
 
@@ -51,22 +54,24 @@ class ProcessTest extends TestCase
         $loop      = LoopFactory::create();
         /** @var TaskInterface[] $tasks */
         $tasks        = [
-            'id1' => new SunValley\TaskManager\Tests\Fixtures\Task\TestAsyncTask('id1', ['timer' => mt_rand(10, 50) / 100, 'return' => 'ab1']),
-            'id2' => new SunValley\TaskManager\Tests\Fixtures\Task\TestAsyncTask('id2', ['timer' => mt_rand(10, 50) / 100, 'return' => 'cd2']),
-            'id3' => new SunValley\TaskManager\Tests\Fixtures\Task\TestAsyncTask('id3', ['timer' => mt_rand(10, 50) / 100, 'return' => 'x3']),
+            'id1' => new TestAsyncTask('id1', ['timer' => mt_rand(10, 50) / 100, 'return' => 'ab1']),
+            'id2' => new TestAsyncTask('id2', ['timer' => mt_rand(10, 50) / 100, 'return' => 'cd2']),
+            'id3' => new TestAsyncTask('id3', ['timer' => mt_rand(10, 50) / 100, 'return' => 'x3']),
         ];
         $foundResults = [];
 
-        Process::create($messenger, $loop)->on(
-            'done',
-            function (ProgressReporter $reporter) use (&$foundResults, $tasks, $loop) {
-                $foundResults[$reporter->getTask()->getId()] = $reporter->getResult();
+        Process::create($messenger, $loop)
+               ->on(
+                   'done',
+                   function (ProgressReporter $reporter) use (&$foundResults, $tasks, $loop) {
+                       $foundResults[$reporter->getTask()
+                                              ->getId()] = $reporter->getResult();
 
-                if (count($foundResults) === count($tasks)) {
-                    $loop->stop();
-                }
-            }
-        );
+                       if (count($foundResults) === count($tasks)) {
+                           $loop->stop();
+                       }
+                   }
+               );
         foreach ($tasks as $task) {
             $messenger->callRpc('submit-task', new Payload(['task' => serialize($task)]));
         }
