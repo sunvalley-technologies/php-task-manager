@@ -11,7 +11,6 @@ use SunValley\TaskManager\ProgressReporter;
 use SunValley\TaskManager\ServiceStatusInterface;
 use SunValley\TaskManager\ServiceTaskInterface;
 
-/** @internal */
 class ServiceStatus implements ServiceStatusInterface
 {
 
