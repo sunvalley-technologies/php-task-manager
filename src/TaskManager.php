@@ -200,8 +200,9 @@ class TaskManager extends EventEmitter
      * @param TaskInterface $task
      *
      * @return ExtendedPromiseInterface Returns a promise that resolves with a ProgressReporter interface which
-     *                                  indicates both failure and success on completion or failure. Promise is
-     *                                  rejected when task is failed to be submitted to queue not when a task is failed.
+     *                                  indicates both failure and success on completion or failure (i.e. returned
+     *                                  promise resolves when task is concluded). Promise is rejected when task is
+     *                                  failed to be submitted to queue not when a task is failed.
      */
     public function submitTask(TaskInterface $task): ExtendedPromiseInterface
     {
