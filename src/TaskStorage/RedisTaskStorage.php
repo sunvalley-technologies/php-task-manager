@@ -9,6 +9,7 @@ use React\Promise\PromiseInterface;
 use SunValley\TaskManager\ProgressReporter;
 use SunValley\TaskManager\TaskInterface;
 use SunValley\TaskManager\TaskStorageInterface;
+use function React\Promise\reject;
 use function React\Promise\resolve;
 
 /**
@@ -59,6 +60,32 @@ class RedisTaskStorage implements TaskStorageInterface
             }
         );
     }
+
+    /**
+     * @inheritDoc
+     */
+    public function findAll(): PromiseInterface
+    {
+        return $this->client->hgetall($this->key)->then(
+            function ($rawValue) {
+
+                /** @var ProgressReporter[] $reporters */
+                $reporters = [];
+
+                foreach ($rawValue as $tasId => $serializedReporter) {
+                    $serializedReporter = array_shift($rawValue);
+                    $reporter = unserialize($serializedReporter);
+                    if (!$reporter instanceof ProgressReporter) {
+                        return reject('hgetall call resolved into an array with an unexpected value');
+                    }
+                    $reporters[] = $reporter;
+                }
+
+                return resolve($reporters);
+            }
+        );
+    }
+
 
     /** @inheritDoc */
     public function count(): PromiseInterface

@@ -26,9 +26,24 @@ class TaskStorageTest extends TestCase
         $client  = $this->generateRedisClient();
         $storage->setClient($client);
         $task = $this->buildTask();
+
+        // testing getting all before insertion
+        $total = await($storage->count(), $loop);
+        $this->assertEquals(0, $total);
+
+        $all = await($storage->findAll(), $loop);
+        $this->assertEquals([], $all);
+
         await($storage->insert($task), $loop);
         $total = await($storage->count(), $loop);
         $this->assertEquals(1, $total);
+
+        // testing getting all right after the insertion
+        $all = await($storage->findAll(), $loop);
+        $this->assertIsArray($all);
+        $this->assertCount(1, $all);
+        $this->assertInstanceOf(ProgressReporter::class, $all[0]);
+
         /** @var ProgressReporter $fetchTask */
         $fetchTask = await($storage->findById($task->getId()), $loop);
         $this->assertNotNull($fetchTask);
@@ -111,6 +126,11 @@ class TaskStorageTest extends TestCase
                 }
 
                 return resolve(null);
+            }
+
+            function hgetall($hashKey): ExtendedPromiseInterface
+            {
+                return resolve($this->storage);
             }
 
             function hlen($name): ExtendedPromiseInterface

@@ -26,6 +26,16 @@ interface TaskStorageInterface
      */
     public function findById(string $taskId): PromiseInterface;
 
+
+    /**
+     * returns a promise resolving into an array ProgressReporter instances
+     * for all the tasks in the storage
+     *
+     * @return PromiseInterface<array>
+     */
+    public function findAll(): PromiseInterface;
+
+
     /**
      * Find and return the count of total tasks in this storage
      *

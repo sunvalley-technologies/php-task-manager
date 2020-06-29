@@ -94,6 +94,19 @@ class Client
     }
 
     /**
+     *
+     * @return PromiseInterface<array> Returns a promise resolving into an array of ProgressReporters representing all tasks in the storage
+     * @throws \RuntimeException Thrown when no storage is detected
+     */
+    public function checkAllTasksStatus(): PromiseInterface
+    {
+        if (!$this->storage) {
+            throw new \RuntimeException('No storage is defined');
+        }
+        return $this->storage->findAll();
+    }
+
+    /**
      * Check a task status that is stored in the storage. Requires a storage or throws an exception.
      *
      * @param string $taskId
@@ -107,4 +120,17 @@ class Client
         return await($this->checkTaskStatus($taskId), $this->storage->getLoop());
     }
 
+    /**
+     *
+     * @return ProgressReporter[] Returns an array of ProgressReporters representing all tasks in the storage
+     * @throws \RuntimeException Thrown when no storage is detected
+     * @throws \Exception
+     */
+    public function checkAllTasksStatusSync(): PromiseInterface
+    {
+        if (!$this->storage) {
+            throw new \RuntimeException('No storage is defined');
+        }
+        return await($this->storage->findAll(), $this->storage->getLoop());
+    }
 }
