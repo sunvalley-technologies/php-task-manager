@@ -130,7 +130,16 @@ class TaskStorageTest extends TestCase
 
             function hgetall($hashKey): ExtendedPromiseInterface
             {
-                return resolve($this->storage);
+                $valueToResolveWith = [];
+
+                // below we emulate the way real redis returns hash contents, that is:
+                // [ key1, value1, key2, value2, ... ]
+                foreach ($this->storage as $key => $value) {
+                    $valueToResolveWith[] = $key;
+                    $valueToResolveWith[] = $value;
+                }
+
+                return resolve($valueToResolveWith);
             }
 
             function hlen($name): ExtendedPromiseInterface
