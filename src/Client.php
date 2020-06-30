@@ -129,9 +129,6 @@ class Client
      */
     public function checkAllTasksStatusSync(): array
     {
-        if (!$this->storage) {
-            throw new \RuntimeException('No storage is defined');
-        }
-        return await($this->storage->findAll(), $this->storage->getLoop());
+        return await($this->checkAllTasksStatus(), $this->storage->getLoop());
     }
 }
