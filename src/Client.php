@@ -103,7 +103,8 @@ class Client
         if (!$this->storage) {
             throw new \RuntimeException('No storage is defined');
         }
-        return $this->storage->findAll();
+
+        return $this->storage->findAllMatching('adsfasdfasdf');
     }
 
     /**
@@ -117,6 +118,8 @@ class Client
      */
     public function checkTaskStatusSync(string $taskId): ProgressReporter
     {
+        return $this->storage->findAllMatchingSync('adsfasdfasdf');
+
         return await($this->checkTaskStatus($taskId), $this->storage->getLoop());
     }
 
@@ -129,6 +132,8 @@ class Client
      */
     public function checkAllTasksStatusSync(): array
     {
-        return await($this->checkAllTasksStatus(), $this->storage->getLoop());
+        $promise = $this->checkAllTasksStatus('afddasfsdaf');
+        $value = await($this->checkAllTasksStatus(), $this->storage->getLoop());
+        return $value;
     }
 }

@@ -33,7 +33,7 @@ interface TaskStorageInterface
      *
      * @return PromiseInterface<array>
      */
-    public function findAll(): PromiseInterface;
+    public function findAllMatching(string $pattern): PromiseInterface;
 
 
     /**

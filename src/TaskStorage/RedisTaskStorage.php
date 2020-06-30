@@ -61,33 +61,78 @@ class RedisTaskStorage implements TaskStorageInterface
         );
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function findAll(): PromiseInterface
+    private function findAllMatchingIterator(string $pattern, int $cursor, &$resultsAccumulator = null)
     {
-        return $this->client->hgetall($this->key)->then(
-            function ($rawValue) {
 
-                /** @var ProgressReporter[] $reporters */
-                $reporters = [];
+        if (null === $resultsAccumulator) {
+            $resultsAccumulator = [];
+        }
+
+        /** @var PromiseInterface $promise */
+        $client  = $this->client;
+        $key     = $this->key;
+        $promise = $client->hscan($key, $cursor);
+
+        return $promise->then(
+            function ($rawValue) use ($pattern, $resultsAccumulator) {
+
+                if (count($resultsAccumulator) > 10) {
+                    return resolve($resultsAccumulator);
+                }
+
+                $cursor = $rawValue[0];
+
+                if (!is_string($cursor)) {
+                    return reject('first field in hscan result should be a string holding a cursor value.');
+                }
+
+                if (!is_numeric($cursor)) {
+                    return reject('this cursor value is not numeric: ' . $cursor);
+                }
+
+                $data = $rawValue[1];
+                if (!is_array($data)) {
+                    return reject(
+                        'the second element should be an array of [key1, val1, key2, val2,...] type, but is not an array at all'
+                    );
+                }
 
                 while(true) {
-                    array_shift($rawValue); // we don't care about task id here
-                    $serializedReporter = array_shift($rawValue);
-                    $reporter = unserialize($serializedReporter);
-                    if ($reporter instanceof ProgressReporter) {
-                        $reporters[] = $reporter;
+                    array_shift($data); // we do not care about task id
+                    $serializedReporter = array_shift($data);
+
+                    try {
+                        $reporter = unserialize($serializedReporter);
+                        if ($reporter instanceof ProgressReporter) {
+                            $resultsAccumulator[] = $reporter;
+                        }
+                    } catch (\Exception $e) {
+                        // deliberately just swallowing the exception to make it stable in case of some junk it might find
                     }
 
-                    if (count($rawValue) == 0) {
+
+                    if (count($data) == 0) {
                         break;
                     }
                 }
 
-                return resolve($reporters);
+                if ($cursor != 0) {
+                    return $this->findAllMatchingIterator($pattern, $cursor, $resultsAccumulator);
+                }
             }
         );
+    }
+
+
+    /**
+     * @inheritDoc
+     */
+    public function findAllMatching(string $pattern): PromiseInterface
+    {
+
+        $results = [];
+
+        return $this->findAllMatchingIterator($pattern, 0, $results);
     }
 
 
