@@ -72,13 +72,17 @@ class RedisTaskStorage implements TaskStorageInterface
                 /** @var ProgressReporter[] $reporters */
                 $reporters = [];
 
-                foreach ($rawValue as $tasId => $serializedReporter) {
+                while(true) {
+                    array_shift($rawValue); // we don't care about task id here
                     $serializedReporter = array_shift($rawValue);
                     $reporter = unserialize($serializedReporter);
-                    if (!$reporter instanceof ProgressReporter) {
-                        return reject('hgetall call resolved into an array with an unexpected value');
+                    if ($reporter instanceof ProgressReporter) {
+                        $reporters[] = $reporter;
                     }
-                    $reporters[] = $reporter;
+
+                    if (count($rawValue) == 0) {
+                        break;
+                    }
                 }
 
                 return resolve($reporters);

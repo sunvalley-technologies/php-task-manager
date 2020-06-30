@@ -8,7 +8,7 @@ use function Clue\React\Block\await;
 
 /**
  * Class Client is the class that should be exposed to remote task submitter. This class provides blocking methods along
- * with asyncronous methods.
+ * with asynchronous methods.
  *
  * @package SunValley\TaskManager
  */
@@ -123,10 +123,11 @@ class Client
     /**
      *
      * @return ProgressReporter[] Returns an array of ProgressReporters representing all tasks in the storage
+     *
      * @throws \RuntimeException Thrown when no storage is detected
      * @throws \Exception
      */
-    public function checkAllTasksStatusSync(): PromiseInterface
+    public function checkAllTasksStatusSync(): array
     {
         if (!$this->storage) {
             throw new \RuntimeException('No storage is defined');
