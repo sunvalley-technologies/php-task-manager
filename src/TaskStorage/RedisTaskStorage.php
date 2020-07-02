@@ -59,6 +59,21 @@ class RedisTaskStorage implements TaskStorageInterface
             }
         );
     }
+    
+    /**
+     * Find tasks by their status
+     * 
+     * @param TaskStatus $status
+     * @param int $offset
+     * @param int $limit
+     * 
+     * @return PromiseInterface<ProgressReporter[]>
+     */
+     public function findByStatus(TaskStatus $status, int $offset, int $limit): PromiseInterface
+     {
+         // TODO: Find from new set and return with hmget
+     }
+
 
     /** @inheritDoc */
     public function count(): PromiseInterface
@@ -69,6 +84,9 @@ class RedisTaskStorage implements TaskStorageInterface
     /** @inheritDoc */
     public function update(ProgressReporter $reporter): PromiseInterface
     {
+      
+        // TODO: add to status set with transaction
+      
         return $this->client->hset(
             $this->key,
             $reporter->getTask()->getId(),
@@ -79,6 +97,8 @@ class RedisTaskStorage implements TaskStorageInterface
     /** @inheritDoc */
     public function insert(TaskInterface $task): PromiseInterface
     {
+        // TODO: add to status set with transaction
+      
         return $this->client->hset(
             $this->key,
             $task->getId(),
@@ -89,6 +109,8 @@ class RedisTaskStorage implements TaskStorageInterface
     /** @inheritDoc */
     public function cancel(TaskInterface $task): PromiseInterface
     {
+        // TODO: add to status set with transaction
+      
         return $this->client->hset(
             $this->key,
             $task->getId(),
@@ -99,6 +121,8 @@ class RedisTaskStorage implements TaskStorageInterface
     /** @inheritDoc */
     public function delete(string $taskId): PromiseInterface
     {
+        // TODO: remove from set
+      
         return $this->client->hdel($this->key, $taskId);
     }
 
