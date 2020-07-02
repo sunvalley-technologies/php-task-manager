@@ -26,6 +26,18 @@ interface TaskStorageInterface
      */
     public function findById(string $taskId): PromiseInterface;
 
+    
+    /**
+     * Find tasks by their status
+     * 
+     * @param TaskStatus $status
+     * @param int $offset
+     * @param int $limit
+     * 
+     * @return PromiseInterface<ProgressReporter[]>
+     */
+     public function findByStatus(TaskStatus $status, int $offset, int $limit): PromiseInterface;
+
     /**
      * Find and return the count of total tasks in this storage
      *
