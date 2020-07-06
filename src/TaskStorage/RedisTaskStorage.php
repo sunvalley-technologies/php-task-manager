@@ -287,7 +287,7 @@ class RedisTaskStorage implements TaskStorageInterface
         return $this->client
             ->multi()
             ->then($fn)
-            ->then([$this->client, 'exec']);
+            ->then([$this->client, 'exec'], [$this->client, 'discard']);
     }
 
     /**
