@@ -5,6 +5,8 @@ namespace SunValley\TaskManager\TaskStorage;
 use Clue\React\Redis\Client as RedisClient;
 use Clue\React\Redis\Factory;
 use React\EventLoop\LoopInterface;
+use function React\Promise\all;
+use React\Promise\Deferred;
 use React\Promise\PromiseInterface;
 use SunValley\TaskManager\ProgressReporter;
 use SunValley\TaskManager\TaskInterface;
@@ -61,24 +63,63 @@ class RedisTaskStorage implements TaskStorageInterface
         );
     }
 
-    private function findAllMatchingIterator(string $pattern, int $cursor, &$resultsAccumulator = null)
+    private function somethingInternal(Deferred $deferred, array $accumulator, int $cursor = null)
+    {
+        /** @var PromiseInterface $promise */
+        $promise = $client->hscan($key, $cursor);
+
+        $promise->then(
+            function() use ($deferred, &$accumulator) {
+                $cursor = 123;
+
+                if ($cursor != 0) {
+                    $this->getLoop()->futureTick(function() use ($deferred, &$accumulator, $cursor) {
+                        $this->somethingInternal($deferred, $accumulator, $cursor);
+                    });
+                } else {
+                    $deferred->resolve($accumulator);
+                }
+            }
+        );
+    }
+
+
+    private function processOneHscanResultData(array $data, array &$resultsAccumulator)
     {
 
-        if (null === $resultsAccumulator) {
-            $resultsAccumulator = [];
+        while(true) {
+            array_shift($data); // we do not care about task id
+            $serializedReporter = array_shift($data);
+
+            try {
+                $reporter = unserialize($serializedReporter);
+                if ($reporter instanceof ProgressReporter) {
+                    $resultsAccumulator[] = $reporter;
+                }
+            } catch (\Exception $e) {
+                // deliberately just swallowing the exception to make it stable in case of some junk it might find
+            }
+
+
+            if (count($data) == 0) {
+                break;
+            }
+        }
+    }
+
+
+    private function processOneBatch(Deferred $deferred, int $cursor, string $pattern, array &$accumulator = null)
+    {
+
+        if (null === $accumulator) {
+            $accumulator = [];
         }
 
         /** @var PromiseInterface $promise */
-        $client  = $this->client;
-        $key     = $this->key;
-        $promise = $client->hscan($key, $cursor);
+        $promise = $this->client->hscan($this->key, $cursor, 'MATCH', $pattern);
 
-        return $promise->then(
-            function ($rawValue) use ($pattern, $resultsAccumulator) {
-
-                if (count($resultsAccumulator) > 10) {
-                    return resolve($resultsAccumulator);
-                }
+        $promise->then(
+            function($rawValue) use ($deferred, &$accumulator, $pattern) {
 
                 $cursor = $rawValue[0];
 
@@ -91,48 +132,68 @@ class RedisTaskStorage implements TaskStorageInterface
                 }
 
                 $data = $rawValue[1];
-                if (!is_array($data)) {
-                    return reject(
-                        'the second element should be an array of [key1, val1, key2, val2,...] type, but is not an array at all'
-                    );
-                }
 
-                while(true) {
-                    array_shift($data); // we do not care about task id
-                    $serializedReporter = array_shift($data);
-
-                    try {
-                        $reporter = unserialize($serializedReporter);
-                        if ($reporter instanceof ProgressReporter) {
-                            $resultsAccumulator[] = $reporter;
-                        }
-                    } catch (\Exception $e) {
-                        // deliberately just swallowing the exception to make it stable in case of some junk it might find
-                    }
-
-
-                    if (count($data) == 0) {
-                        break;
-                    }
-                }
+                $this->processOneHscanResultData($data, $accumulator);
 
                 if ($cursor != 0) {
-                    return $this->findAllMatchingIterator($pattern, $cursor, $resultsAccumulator);
+                    $this->getLoop()->futureTick(function() use ($deferred, $cursor, $pattern, &$accumulator) {
+                        $this->processOneBatch($deferred, $cursor, $pattern, $accumulator);
+                    });
+                } else {
+                    $deferred->resolve($accumulator);
                 }
+
+                return null;
             }
         );
+    }
+
+    /**
+     * @param array $states
+     *
+     * searches for the tasks in each of the requested states and returns a joined promise.
+     *
+     * The glob pattern for SCAN does not support "OR" expressions
+     *
+     * @return PromiseInterface
+     */
+    public function findAllInStates(array $states): PromiseInterface
+    {
+        $perStatePromises = [];
+
+        foreach ($states as $state) {
+            $pattern = $this->createHscanMatchingPatternForState($state);
+            $perStatePromises[] = $this->findAllMatchingPattern($pattern);
+        }
+
+        return all($perStatePromises);
+    }
+
+    /**
+     * This function creates a substring that should be expected to be found
+     * in serialized form of a ProgressReporter object and packs it into
+     * a glob-style expression.
+     *
+     * @see https://user-images.githubusercontent.com/21345604/86157366-f787d800-bb0f-11ea-940c-2ff01cdcfaa9.png
+     *
+     * @param string $state
+     *
+     * @return string
+     */``
+    private function createHscanMatchingPatternForState(string $state): string
+    {
+        return ':\"' . $state . '\";';
     }
 
 
     /**
      * @inheritDoc
      */
-    public function findAllMatching(string $pattern): PromiseInterface
+    private function findAllMatchingPattern(string $pattern): PromiseInterface
     {
-
-        $results = [];
-
-        return $this->findAllMatchingIterator($pattern, 0, $results);
+        $deferred = new Deferred();
+        $this->processOneBatch($deferred, 0, $pattern);
+        return $deferred->promise();
     }
 
 

@@ -3,6 +3,7 @@
 
 namespace SunValley\TaskManager;
 
+use function React\Promise\all;
 use React\Promise\PromiseInterface;
 use function Clue\React\Block\await;
 
@@ -96,15 +97,22 @@ class Client
     /**
      *
      * @return PromiseInterface<array> Returns a promise resolving into an array of ProgressReporters representing all tasks in the storage
+     *                                 Only returs tasks in PROCESSING and WAITING states.
+     *
      * @throws \RuntimeException Thrown when no storage is detected
      */
-    public function checkAllTasksStatus(): PromiseInterface
+    public function checkAllActiveTasksStatus(): PromiseInterface
     {
         if (!$this->storage) {
             throw new \RuntimeException('No storage is defined');
         }
 
-        return $this->storage->findAllMatching('adsfasdfasdf');
+        $joinedPromise = all($this->storage->findAllInStates([TaskStatus::COMPLETED, TaskStatus::WAITING]));
+        return $joinedPromise->then(
+            function($results) {
+                return call_user_func_array('array_merge', $results);
+            }
+        );
     }
 
     /**
@@ -130,10 +138,9 @@ class Client
      * @throws \RuntimeException Thrown when no storage is detected
      * @throws \Exception
      */
-    public function checkAllTasksStatusSync(): array
+    public function checkAllActiveTasksStatusSync(): array
     {
-        $promise = $this->checkAllTasksStatus('afddasfsdaf');
-        $value = await($this->checkAllTasksStatus(), $this->storage->getLoop());
+        $value = await($this->checkAllActiveTasksStatus(), $this->storage->getLoop());
         return $value;
     }
 }

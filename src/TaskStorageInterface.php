@@ -29,11 +29,13 @@ interface TaskStorageInterface
 
     /**
      * returns a promise resolving into an array ProgressReporter instances
-     * for all the tasks in the storage
+     * for all the tasks in the storage which are currently in any of the states
      *
+     * @parameter string[] $states
      * @return PromiseInterface<array>
+     *
      */
-    public function findAllMatching(string $pattern): PromiseInterface;
+    public function findAllInStates(array $states): PromiseInterface;
 
 
     /**
