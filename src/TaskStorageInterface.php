@@ -16,7 +16,7 @@ interface TaskStorageInterface
      * @return LoopInterface
      */
     public function getLoop(): LoopInterface;
-    
+
     /**
      * Find and return the task from storage by its identifier and returns a promise for the result
      *
@@ -26,17 +26,17 @@ interface TaskStorageInterface
      */
     public function findById(string $taskId): PromiseInterface;
 
-    
+
     /**
      * Find tasks by their status
-     * 
-     * @param TaskStatus $status
-     * @param int $offset
-     * @param int $limit
-     * 
-     * @return PromiseInterface<ProgressReporter[]>
+     *
+     * @param bool $finished
+     * @param int  $offset
+     * @param int  $limit
+     *
+     * @return PromiseInterface|PromiseInterface<ProgressReporter[]>
      */
-     public function findByStatus(TaskStatus $status, int $offset, int $limit): PromiseInterface;
+    public function findByStatus(bool $finished, int $offset, int $limit): PromiseInterface;
 
     /**
      * Find and return the count of total tasks in this storage
@@ -50,16 +50,16 @@ interface TaskStorageInterface
      *
      * @param ProgressReporter $reporter
      *
-     * @return PromiseInterface
+     * @return PromiseInterface<void>
      */
     public function update(ProgressReporter $reporter): PromiseInterface;
 
     /**
      * Insert given task to the storage
-     * 
+     *
      * @param TaskInterface $task
      *
-     * @return PromiseInterface
+     * @return PromiseInterface<void>
      */
     public function insert(TaskInterface $task): PromiseInterface;
 
@@ -68,7 +68,7 @@ interface TaskStorageInterface
      *
      * @param TaskInterface $task
      *
-     * @return PromiseInterface
+     * @return PromiseInterface<void>
      */
     public function cancel(TaskInterface $task): PromiseInterface;
 
@@ -77,7 +77,7 @@ interface TaskStorageInterface
      *
      * @param string $taskId
      *
-     * @return PromiseInterface
+     * @return PromiseInterface<void>
      */
     public function delete(string $taskId): PromiseInterface;
 }
