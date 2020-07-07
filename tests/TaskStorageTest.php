@@ -48,7 +48,13 @@ class TaskStorageTest extends TestCase
     {
         $redisUri = $_SERVER['REDIS_URI'] ?? $_ENV['REDIS_URI'] ?? 'redis://localhost:6379';
 
-        return new RedisTaskStorage($loop, $redisUri);
+        return new class($loop, $redisUri) extends RedisTaskStorage {
+            
+            public function getClient()
+            {
+                return $this->client;
+            }
+        };
     }
 
     protected function buildTask()

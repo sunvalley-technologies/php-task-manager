@@ -201,20 +201,19 @@ class RedisTaskStorage implements TaskStorageInterface
     {
         return $this->transactional(
             function () use ($reporter) {
-                return all(
-                    [
-                        $this->client->hset(
-                            $this->key,
-                            $reporter->getTask()->getId(),
-                            serialize(ProgressReporter::generateWaitingReporter($reporter->getTask()))
-                        ),
-                        $reporter->isCompleted() || $reporter->isFailed() ? $this->client->smove(
-                            $this->generateGroupKey('unfinished'),
-                            $this->generateGroupKey('finished'),
-                            $reporter->getTask()->getId()
-                        ) : resolve(),
-                    ]
+                $this->client->hset(
+                    $this->key,
+                    $reporter->getTask()->getId(),
+                    serialize(ProgressReporter::generateWaitingReporter($reporter->getTask()))
                 );
+
+                if ($reporter->isCompleted() || $reporter->isFailed()) {
+                    $this->client->smove(
+                        $this->generateGroupKey('unfinished'),
+                        $this->generateGroupKey('finished'),
+                        $reporter->getTask()->getId()
+                    );
+                }
             }
         );
     }
@@ -224,16 +223,13 @@ class RedisTaskStorage implements TaskStorageInterface
     {
         return $this->transactional(
             function () use ($task) {
-                return all(
-                    [
-                        $this->client->hset(
-                            $this->key,
-                            $task->getId(),
-                            serialize(ProgressReporter::generateWaitingReporter($task))
-                        ),
-                        $this->client->sadd($this->generateGroupKey('unfinished'), $task->getId()),
-                    ]
+                $this->client->hset(
+                    $this->key,
+                    $task->getId(),
+                    serialize(ProgressReporter::generateWaitingReporter($task))
                 );
+                
+                $this->client->sadd($this->generateGroupKey('unfinished'), $task->getId());
             }
         );
 
@@ -244,19 +240,15 @@ class RedisTaskStorage implements TaskStorageInterface
     {
         return $this->transactional(
             function () use ($task) {
-                return all(
-                    [
-                        $this->client->hset(
-                            $this->key,
-                            $task->getId(),
-                            serialize(ProgressReporter::generateCancelledReporter($task))
-                        ),
-                        $this->client->smove(
-                            $this->generateGroupKey('unfinished'),
-                            $this->generateGroupKey('finished'),
-                            $task->getId()
-                        ),
-                    ]
+                $this->client->hset(
+                    $this->key,
+                    $task->getId(),
+                    serialize(ProgressReporter::generateCancelledReporter($task))
+                );
+                $this->client->smove(
+                    $this->generateGroupKey('unfinished'),
+                    $this->generateGroupKey('finished'),
+                    $task->getId()
                 );
             }
         );
@@ -267,13 +259,9 @@ class RedisTaskStorage implements TaskStorageInterface
     {
         return $this->transactional(
             function () use ($taskId) {
-                return all(
-                    [
-                        $this->client->hdel($this->key, $taskId),
-                        $this->client->srem($this->generateGroupKey('unfinished'), $taskId),
-                        $this->client->srem($this->generateGroupKey('finished'), $taskId),
-                    ]
-                );
+                $this->client->hdel($this->key, $taskId);
+                $this->client->srem($this->generateGroupKey('unfinished'), $taskId);
+                $this->client->srem($this->generateGroupKey('finished'), $taskId);
             }
         );
 
@@ -288,7 +276,7 @@ class RedisTaskStorage implements TaskStorageInterface
     /**
      * Run the given function in a Redis multi/exec
      *
-     * @param callable $fn
+     * @param callable $fn Callable that does not need to return a promise
      *
      * @return PromiseInterface
      */
@@ -296,13 +284,21 @@ class RedisTaskStorage implements TaskStorageInterface
     {
         return $this->client
             ->multi()
-            ->then($fn)
             ->then(
-                function () {
+                function () use ($fn) {
+                    $fn();
+
                     return $this->client->exec();
-                },
+                }
+            )
+            ->otherwise(
                 function () {
-                    return $this->client->discard();
+                    function ($v = null)
+                    {
+                        $this->client->discard();
+
+                        return $v;
+                    }
                 }
             );
     }
