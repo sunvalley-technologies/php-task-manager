@@ -3,18 +3,14 @@
 
 namespace SunValley\TaskManager\Tests;
 
-use Clue\React\Redis\Client;
-use Evenement\EventEmitterTrait;
 use PHPUnit\Framework\TestCase;
 use React\EventLoop\Factory;
-use React\EventLoop\LoopInterface;
-use React\Promise\ExtendedPromiseInterface;
 use SunValley\TaskManager\ProgressReporter;
 use SunValley\TaskManager\TaskStatus;
 use SunValley\TaskManager\TaskStorage\RedisTaskStorage;
 use SunValley\TaskManager\Tests\Fixtures\Task\TestMultiplyTask;
 use function Clue\React\Block\await;
-use function React\Promise\resolve;
+use function React\Promise\all;
 
 class TaskStorageTest extends TestCase
 {
@@ -23,12 +19,43 @@ class TaskStorageTest extends TestCase
     {
         $loop    = Factory::create();
         $storage = $this->generateRedisStorage($loop);
-        $client  = $this->generateRedisClient();
-        $storage->setClient($client);
-        $task = $this->buildTask();
+        $storage->clean();
+        $task  = $this->buildTask('-task1');
+        $task2 = $this->buildTask('-task2');
+        $task3 = $this->buildTask('-task3');
+        $task4 = $this->buildTask('-task4');
+        $task5 = $this->buildTask('-task5');
+
         await($storage->insert($task), $loop);
+
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($task2), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($task3), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($task4), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($this->buildTask()), $loop);
+        await($storage->insert($task5), $loop);
+
         $total = await($storage->count(), $loop);
-        $this->assertEquals(1, $total);
+        $this->assertEquals(26, $total);
         /** @var ProgressReporter $fetchTask */
         $fetchTask = await($storage->findById($task->getId()), $loop);
         $this->assertNotNull($fetchTask);
@@ -41,104 +68,71 @@ class TaskStorageTest extends TestCase
         $fetchTask = await($storage->findById($task->getId()), $loop);
         $this->assertEquals($fetchTask->getStatus(), TaskStatus::COMPLETED());
 
-        $storage->cancel($task);
+        await($storage->cancel($task), $loop);
         $fetchTask = await($storage->findById($task->getId()), $loop);
         $this->assertEquals($fetchTask->getStatus(), TaskStatus::CANCELLED());
 
-        $storage->delete($task->getId());
+        // try finding by status
+        $finishedCount = await($storage->countByStatus(true), $loop);
+        $this->assertEquals(1, $finishedCount);
+        $finishedCount = await($storage->countByStatus(false), $loop);
+        $this->assertEquals(25, $finishedCount);
+
+        // try scanning unfinished to see if finding by status is working
+        /** @var ProgressReporter[] $unfinishedTasks */
+        $unfinishedTasks = await($storage->findByStatus(false, 10, 5), $loop);
+        $this->assertEquals(5, count($unfinishedTasks));
+        // check if offset is working by checking task3 is in the list
+        $found = false;
+        foreach ($unfinishedTasks as $unfinishedTask) {
+            if ($unfinishedTask->getTask()->getId() === $task3->getId()) {
+                $found = true;
+                break;
+            }
+        }
+        $this->assertTrue($found);
+
+        // try delete
+        await($storage->delete($task->getId()), $loop);
         $fetchTask = await($storage->findById($task->getId()), $loop);
         $this->assertNull($fetchTask);
+        $finishedCount = await($storage->countByStatus(true), $loop);
+        $this->assertEquals(0, $finishedCount);
+
 
     }
 
     protected function generateRedisStorage($loop)
     {
-        return new class($loop) extends RedisTaskStorage
-        {
+        $redisUri = $_SERVER['REDIS_URI'] ?? $_ENV['REDIS_URI'] ?? 'redis://localhost:6379';
 
-            public function __construct(LoopInterface $loop)
+        return new class($loop, $redisUri) extends RedisTaskStorage {
+
+            public function getClient()
             {
-                $this->loop = $loop;
+                return $this->client;
             }
 
-            /**
-             * @param Client $client
-             */
-            public function setClient(Client $client): void
+            public function clean()
             {
-                $this->client = $client;
-            }
+                await(
+                    all(
+                        [
+                            $this->client->del($this->key),
+                            $this->client->del($this->generateGroupKey('finished')),
+                            $this->client->del($this->generateGroupKey('unfinished')),
+                        ]
+                    ),
+                    $this->getLoop()
+                );
 
+            }
         };
     }
 
-    protected function generateRedisClient()
+    protected function buildTask($named = null)
     {
-        return new class implements Client
-        {
-            use EventEmitterTrait;
-
-            private $storage = [];
-
-            function hexists($name, $key): ExtendedPromiseInterface
-            {
-                return resolve(isset($this->storage[$key]) ? 1 : 0);
-            }
-
-            function hset($name, $key, $value): ExtendedPromiseInterface
-            {
-                $this->storage[$key] = $value;
-
-                return resolve(1);
-            }
-
-            function hdel($name, $key): ExtendedPromiseInterface
-            {
-                if (isset($this->storage[$key])) {
-                    unset($this->storage[$key]);
-
-                    return resolve(1);
-                }
-
-
-                return resolve(0);
-            }
-
-            function hget($name, $key): ExtendedPromiseInterface
-            {
-                if (isset($this->storage[$key])) {
-                    return resolve($this->storage[$key]);
-                }
-
-                return resolve(null);
-            }
-
-            function hlen($name): ExtendedPromiseInterface
-            {
-
-                return resolve(count($this->storage));
-            }
-
-
-            public function __call($name, $args)
-            {
-            }
-
-            public function end()
-            {
-            }
-
-            public function close()
-            {
-            }
-
-
-        };
-    }
-
-    protected function buildTask()
-    {
-        $task = new TestMultiplyTask(uniqid(), ['number1' => mt_rand(), 'number2' => mt_rand()]);
+        $task = new TestMultiplyTask(uniqid() . ((string) $named), ['number1' => mt_rand(), 'number2' => mt_rand()]);
 
         return $task;
     }

@@ -104,7 +104,106 @@ class Client
      */
     public function checkTaskStatusSync(string $taskId): ProgressReporter
     {
+        if (!$this->storage) {
+            throw new \RuntimeException('No storage is defined');
+        }
+
         return await($this->checkTaskStatus($taskId), $this->storage->getLoop());
     }
 
+    /**
+     * Find tasks by status
+     *
+     * @param bool $finished False for progressing tasks, true for finished tasks
+     * @param int  $offset
+     * @param int  $limit
+     *
+     * @return PromiseInterface<ProgressReporter[]>|PromiseInterface
+     */
+    public function findTasksByStatus(bool $finished, int $offset, int $limit): PromiseInterface
+    {
+        if (!$this->storage) {
+            throw new \RuntimeException('No storage is defined');
+        }
+
+        return $this->storage->findByStatus($finished, $offset, $limit);
+    }
+
+    /**
+     * Find tasks by status
+     *
+     * @param bool $finished False for progressing tasks, true for finished tasks
+     * @param int  $offset
+     * @param int  $limit
+     *
+     * @return ProgressReporter[]
+     */
+    public function findTasksByStatusSync(bool $finished, int $offset, int $limit): array
+    {
+        if (!$this->storage) {
+            throw new \RuntimeException('No storage is defined');
+        }
+
+        return await($this->findTasksByStatus($finished, $offset, $limit), $this->storage->getLoop());
+    }
+
+    /**
+     * Returns the total task count
+     *
+     * @return PromiseInterface<int>
+     */
+    public function totalTaskCount(): PromiseInterface
+    {
+        if (!$this->storage) {
+            throw new \RuntimeException('No storage is defined');
+        }
+
+        return $this->storage->count();
+    }
+
+    /**
+     * Returns the total task count
+     *
+     * @return PromiseInterface<int>
+     */
+    public function totalTaskCountSync(): int
+    {
+        if (!$this->storage) {
+            throw new \RuntimeException('No storage is defined');
+        }
+
+        return await($this->storage->count(), $this->storage->getLoop());
+    }
+
+    /**
+     * Find task counts by status
+     *
+     * @param bool $finished False for progressing tasks, true for finished tasks
+     *
+     * @return PromiseInterface<int>
+     */
+    public function countTasksByStatus(bool $finished): PromiseInterface
+    {
+        if (!$this->storage) {
+            throw new \RuntimeException('No storage is defined');
+        }
+
+        return $this->storage->countByStatus($finished);
+    }
+
+    /**
+     * Find task counts by status
+     *
+     * @param bool $finished False for progressing tasks, true for finished tasks
+     *
+     * @return int
+     */
+    public function countTasksByStatusSync(bool $finished): int
+    {
+        if (!$this->storage) {
+            throw new \RuntimeException('No storage is defined');
+        }
+
+        return await($this->storage->countByStatus($finished), $this->storage->getLoop());
+    }
 }
