@@ -155,29 +155,39 @@ class RedisTaskStorage implements TaskStorageInterface
                     }
 
                     $this->getLoop()->futureTick(
-                        function () use ($fromKey, $count, &$iterationFn) {
-                            $this->client->sscan($fromKey, 0, 'COUNT', $count)->then($iterationFn);
+                        function () use ($fromKey, $count, &$iterationFn, $defer) {
+                            $this->client->sscan($fromKey, 0, 'COUNT', $count)->then(
+                                $iterationFn,
+                                function ($v = null) use ($defer) {
+                                    $defer->reject($v);
+                                }
+                            );
                         }
                     );
                 }
             );
         };
 
-        $cleanupFn = function ($v) use (&$data, &$currentOffset, &$iterationFn) {
+        $cleanupFn = function ($v = null) use (&$data, &$currentOffset, &$iterationFn) {
             $data          = null;
             $currentOffset = null;
             $iterationFn   = null;
 
-            return resolve($v);
+            return $v;
         };
 
         $this->getLoop()->futureTick(
-            function () use ($fromKey, $count, &$iterationFn) {
-                $this->client->sscan($fromKey, 0, 'COUNT', $count)->then($iterationFn);
+            function () use ($fromKey, $count, &$iterationFn, $defer) {
+                $this->client->sscan($fromKey, 0, 'COUNT', $count)->then(
+                    $iterationFn,
+                    function ($v = null) use ($defer) {
+                        $defer->reject($v);
+                    }
+                );
             }
         );
 
-        return $defer->promise()->then($cleanupFn);
+        return $defer->promise()->always($cleanupFn);
     }
 
     /** @inheritDoc */
@@ -287,7 +297,14 @@ class RedisTaskStorage implements TaskStorageInterface
         return $this->client
             ->multi()
             ->then($fn)
-            ->then([$this->client, 'exec'], [$this->client, 'discard']);
+            ->then(
+                function () {
+                    return $this->client->exec();
+                },
+                function () {
+                    return $this->client->discard();
+                }
+            );
     }
 
     /**
