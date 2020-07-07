@@ -30,7 +30,7 @@ interface TaskStorageInterface
     /**
      * Find tasks by their status
      *
-     * @param bool $finished
+     * @param bool $finished True if task is finished, false otherwise
      * @param int  $offset
      * @param int  $limit
      *
@@ -38,6 +38,15 @@ interface TaskStorageInterface
      */
     public function findByStatus(bool $finished, int $offset, int $limit): PromiseInterface;
 
+    /**
+     * Returns count by status
+     * 
+     * @param bool $finished True if task is finished, false otherwise
+     *
+     * @return PromiseInterface<int>
+     */
+    public function countByStatus(bool $finished): PromiseInterface;
+    
     /**
      * Find and return the count of total tasks in this storage
      *

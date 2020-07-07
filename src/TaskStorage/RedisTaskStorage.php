@@ -10,6 +10,7 @@ use React\Promise\PromiseInterface;
 use SunValley\TaskManager\ProgressReporter;
 use SunValley\TaskManager\TaskInterface;
 use SunValley\TaskManager\TaskStorageInterface;
+use function React\Promise\all;
 use function React\Promise\resolve;
 
 /**
@@ -62,14 +63,15 @@ class RedisTaskStorage implements TaskStorageInterface
         );
     }
 
+    public function countByStatus(bool $finished): PromiseInterface
+    {
+        $fromKey = !$finished ? $this->generateGroupKey('unfinished') : $this->generateGroupKey('finished');
+
+        return $this->client->scard($fromKey);
+    }
+
     /**
-     * Find tasks by their status
-     *
-     * @param bool $finished True if task is finished, false otherwise
-     * @param int  $offset
-     * @param int  $limit
-     *
-     * @return PromiseInterface|PromiseInterface<ProgressReporter[]>
+     * @inheritDoc
      */
     public function findByStatus(bool $finished, int $offset, int $limit): PromiseInterface
     {
@@ -77,7 +79,7 @@ class RedisTaskStorage implements TaskStorageInterface
 
         $data          = [];
         $currentOffset = 0;
-        $count         = 10; // default
+        $count         = $limit < 10 ? $limit : 10; // default
         $defer         = new Deferred();
 
         $iterationFn = function ($result) use (
@@ -198,38 +200,40 @@ class RedisTaskStorage implements TaskStorageInterface
     /** @inheritDoc */
     public function update(ProgressReporter $reporter): PromiseInterface
     {
-        return $this->transactional(
-            function () use ($reporter) {
-                $this->client->hset(
-                    $this->key,
-                    $reporter->getTask()->getId(),
-                    serialize(ProgressReporter::generateWaitingReporter($reporter->getTask()))
-                );
-
-                if ($reporter->isCompleted() || $reporter->isFailed()) {
-                    $this->client->smove(
-                        $this->generateGroupKey('unfinished'),
-                        $this->generateGroupKey('finished'),
-                        $reporter->getTask()->getId()
-                    );
-                }
-            }
+        return resolve(
+            all(
+                [
+                    $this->client->hset(
+                        $this->key,
+                        $reporter->getTask()->getId(),
+                        serialize($reporter)
+                    ),
+                    ($reporter->isCompleted() || $reporter->isFailed()) ?
+                        $this->client->smove(
+                            $this->generateGroupKey('unfinished'),
+                            $this->generateGroupKey('finished'),
+                            $reporter->getTask()->getId()
+                        ) : resolve(),
+                ]
+            )
         );
+
     }
 
     /** @inheritDoc */
     public function insert(TaskInterface $task): PromiseInterface
     {
-        return $this->transactional(
-            function () use ($task) {
-                $this->client->hset(
-                    $this->key,
-                    $task->getId(),
-                    serialize(ProgressReporter::generateWaitingReporter($task))
-                );
-
-                $this->client->sadd($this->generateGroupKey('unfinished'), $task->getId());
-            }
+        return resolve(
+            all(
+                [
+                    $this->client->hset(
+                        $this->key,
+                        $task->getId(),
+                        serialize(ProgressReporter::generateWaitingReporter($task))
+                    ),
+                    $this->client->sadd($this->generateGroupKey('unfinished'), $task->getId()),
+                ]
+            )
         );
 
     }
@@ -237,66 +241,39 @@ class RedisTaskStorage implements TaskStorageInterface
     /** @inheritDoc */
     public function cancel(TaskInterface $task): PromiseInterface
     {
-        return $this->transactional(
-            function () use ($task) {
-                $this->client->hset(
-                    $this->key,
-                    $task->getId(),
-                    serialize(ProgressReporter::generateCancelledReporter($task))
-                );
-                $this->client->smove(
-                    $this->generateGroupKey('unfinished'),
-                    $this->generateGroupKey('finished'),
-                    $task->getId()
-                );
-            }
+        return resolve(
+            all(
+                [
+                    $this->client->hset(
+                        $this->key,
+                        $task->getId(),
+                        serialize(ProgressReporter::generateCancelledReporter($task))
+                    ),
+
+                    $this->client->smove(
+                        $this->generateGroupKey('unfinished'),
+                        $this->generateGroupKey('finished'),
+                        $task->getId()
+                    ),
+                ]
+            )
         );
     }
 
     /** @inheritDoc */
     public function delete(string $taskId): PromiseInterface
     {
-        return $this->transactional(
-            function () use ($taskId) {
-                $this->client->hdel($this->key, $taskId);
-                $this->client->srem($this->generateGroupKey('unfinished'), $taskId);
-                $this->client->srem($this->generateGroupKey('finished'), $taskId);
-            }
-        );
+        $this->client->hdel($this->key, $taskId);
+        $this->client->srem($this->generateGroupKey('unfinished'), $taskId);
+        $this->client->srem($this->generateGroupKey('finished'), $taskId);
 
+        return resolve();
     }
 
     /** @inheritDoc */
     public function getLoop(): LoopInterface
     {
         return $this->loop;
-    }
-
-    /**
-     * Run the given function in a Redis multi/exec
-     *
-     * @param callable $fn Callable that does not need to return a promise
-     *
-     * @return PromiseInterface
-     */
-    protected function transactional(callable $fn): PromiseInterface
-    {
-        return $this->client
-            ->multi()
-            ->then(
-                function () use ($fn) {
-                    $fn();
-
-                    return $this->client->exec();
-                }
-            )
-            ->otherwise(
-                function ($v = null) {
-                    $this->client->discard();
-
-                    return $v;
-                }
-            );
     }
 
     /**
