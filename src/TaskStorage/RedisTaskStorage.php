@@ -172,7 +172,7 @@ class RedisTaskStorage implements TaskStorageInterface
         };
 
         $this->getLoop()->futureTick(
-            function ($fromKey, $count, &$iterationFn) use ($fromKey) {
+            function () use ($fromKey, $count, &$iterationFn) {
                 $this->client->sscan($fromKey, 0, 'COUNT', $count)->then($iterationFn);
             }
         );
