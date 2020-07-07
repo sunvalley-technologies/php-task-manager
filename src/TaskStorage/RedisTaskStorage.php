@@ -10,7 +10,6 @@ use React\Promise\PromiseInterface;
 use SunValley\TaskManager\ProgressReporter;
 use SunValley\TaskManager\TaskInterface;
 use SunValley\TaskManager\TaskStorageInterface;
-use function React\Promise\all;
 use function React\Promise\resolve;
 
 /**
@@ -228,7 +227,7 @@ class RedisTaskStorage implements TaskStorageInterface
                     $task->getId(),
                     serialize(ProgressReporter::generateWaitingReporter($task))
                 );
-                
+
                 $this->client->sadd($this->generateGroupKey('unfinished'), $task->getId());
             }
         );
@@ -292,13 +291,10 @@ class RedisTaskStorage implements TaskStorageInterface
                 }
             )
             ->otherwise(
-                function () {
-                    function ($v = null)
-                    {
-                        $this->client->discard();
+                function ($v = null) {
+                    $this->client->discard();
 
-                        return $v;
-                    }
+                    return $v;
                 }
             );
     }
