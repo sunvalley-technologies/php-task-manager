@@ -20,11 +20,11 @@ class TaskStorageTest extends TestCase
         $loop    = Factory::create();
         $storage = $this->generateRedisStorage($loop);
         $storage->clean();
-        $task  = $this->buildTask();
-        $task2 = $this->buildTask();
-        $task3 = $this->buildTask();
-        $task4 = $this->buildTask();
-        $task5 = $this->buildTask();
+        $task  = $this->buildTask('-task1');
+        $task2 = $this->buildTask('-task2');
+        $task3 = $this->buildTask('-task3');
+        $task4 = $this->buildTask('-task4');
+        $task5 = $this->buildTask('-task5');
 
         await($storage->insert($task), $loop);
 
@@ -81,8 +81,7 @@ class TaskStorageTest extends TestCase
         // try scanning unfinished to see if finding by status is working
         /** @var ProgressReporter[] $unfinishedTasks */
         $unfinishedTasks = await($storage->findByStatus(false, 10, 5), $loop);
-        $this->assertTrue(count($unfinishedTasks) >= 5);
-        $this->assertTrue(count($unfinishedTasks) <= 7); // more or less
+        $this->assertEquals(5, count($unfinishedTasks));
         // check if offset is working by checking task3 is in the list
         $found = false;
         foreach ($unfinishedTasks as $unfinishedTask) {
@@ -131,9 +130,9 @@ class TaskStorageTest extends TestCase
         };
     }
 
-    protected function buildTask()
+    protected function buildTask($named = null)
     {
-        $task = new TestMultiplyTask(uniqid(), ['number1' => mt_rand(), 'number2' => mt_rand()]);
+        $task = new TestMultiplyTask(uniqid() . ((string) $named), ['number1' => mt_rand(), 'number2' => mt_rand()]);
 
         return $task;
     }

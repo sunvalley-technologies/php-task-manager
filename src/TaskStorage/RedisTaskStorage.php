@@ -67,7 +67,7 @@ class RedisTaskStorage implements TaskStorageInterface
     {
         $fromKey = !$finished ? $this->generateGroupKey('unfinished') : $this->generateGroupKey('finished');
 
-        return $this->client->scard($fromKey);
+        return $this->client->llen($fromKey);
     }
 
     /**
@@ -77,118 +77,34 @@ class RedisTaskStorage implements TaskStorageInterface
     {
         $fromKey = !$finished ? $this->generateGroupKey('unfinished') : $this->generateGroupKey('finished');
 
-        $data          = [];
-        $currentOffset = 0;
-        $count         = $limit < 10 ? $limit : 10; // default
-        $defer         = new Deferred();
+        return $this->client->lrange($fromKey, $offset, $offset + $limit - 1)->then(
+            function ($keys = null) {
+                if (is_array($keys)) {
+                    return call_user_func_array([$this->client, 'hmget'], array_merge([$this->key], $keys))->then(
+                        function ($reporters = null) {
+                            if (is_array($reporters)) {
+                                $found = [];
 
-        $iterationFn = function ($result) use (
-            &$data,
-            &$currentOffset,
-            &$iterationFn,
-            $count,
-            $offset,
-            $limit,
-            $fromKey,
-            $defer
-        ) {
-            [$cursor, $keys] = $result;
-
-            // status = 0 => don't save and iterate
-            // status = 1 => save and iterate
-            // status = 2 => save and return
-
-            $currentOffset = $currentOffset + $count;
-            $cursor        = (int)$cursor;
-
-            $sizeOfIteration = count($keys);
-            $sizeOfData      = count($data);
-            if ($currentOffset < $offset) {
-                $status = 0;
-            } else {
-                $newSize = $sizeOfIteration + $sizeOfData;
-                if ($newSize >= $limit) {
-                    $status = 2;
-                } else {
-                    $status = 1;
-                }
-            }
-
-            resolve()->then(
-                function () use ($status, $keys, &$data) {
-                    if ($status > 0) {
-                        return call_user_func_array([$this->client, 'hmget'], array_merge([$this->key], $keys))->then(
-                            function ($results) {
-                                if (is_array($results)) {
-                                    $found = [];
-
-                                    foreach ($results as $result) {
-                                        if ($result !== null) {
-                                            $reporter = unserialize($result);
-                                            if ($reporter instanceof ProgressReporter) {
-                                                $found[] = $reporter;
-                                            }
+                                foreach ($reporters as $result) {
+                                    if ($result !== null) {
+                                        $reporter = unserialize($result);
+                                        if ($reporter instanceof ProgressReporter) {
+                                            $found[] = $reporter;
                                         }
                                     }
-
-                                    return resolve($found);
                                 }
 
-                                return resolve([]);
+                                return resolve($found);
                             }
-                        )->then(
-                            function ($results) use (&$data) {
-                                $data = array_merge($data, $results);
 
-                                return resolve();
-                            }
-                        );
-                    }
-
-                    return resolve();
-                }
-            )->then(
-                function () use (&$data, $cursor, $status, $fromKey, $count, &$iterationFn, $defer) {
-                    if ($cursor === 0 || $status === 2) {
-                        $defer->resolve($data);
-
-                        return;
-                    }
-
-                    $this->getLoop()->futureTick(
-                        function () use ($fromKey, $count, &$iterationFn, $defer) {
-                            $this->client->sscan($fromKey, 0, 'COUNT', $count)->then(
-                                $iterationFn,
-                                function ($v = null) use ($defer) {
-                                    $defer->reject($v);
-                                }
-                            );
+                            return resolve([]);
                         }
                     );
                 }
-            );
-        };
 
-        $cleanupFn = function ($v = null) use (&$data, &$currentOffset, &$iterationFn) {
-            $data          = null;
-            $currentOffset = null;
-            $iterationFn   = null;
-
-            return $v;
-        };
-
-        $this->getLoop()->futureTick(
-            function () use ($fromKey, $count, &$iterationFn, $defer) {
-                $this->client->sscan($fromKey, 0, 'COUNT', $count)->then(
-                    $iterationFn,
-                    function ($v = null) use ($defer) {
-                        $defer->reject($v);
-                    }
-                );
+                return resolve([]);
             }
         );
-
-        return $defer->promise()->always($cleanupFn);
     }
 
     /** @inheritDoc */
@@ -200,20 +116,22 @@ class RedisTaskStorage implements TaskStorageInterface
     /** @inheritDoc */
     public function update(ProgressReporter $reporter): PromiseInterface
     {
+        $taskId = $reporter->getTask()->getId();
+
         return resolve(
             all(
                 [
                     $this->client->hset(
                         $this->key,
-                        $reporter->getTask()->getId(),
+                        $taskId,
                         serialize($reporter)
                     ),
                     ($reporter->isCompleted() || $reporter->isFailed()) ?
-                        $this->client->smove(
-                            $this->generateGroupKey('unfinished'),
-                            $this->generateGroupKey('finished'),
-                            $reporter->getTask()->getId()
-                        ) : resolve(),
+                        $this->client->lrem($this->generateGroupKey('unfinished'), 1, $taskId) : resolve(),
+                    ($reporter->isCompleted() || $reporter->isFailed()) ?
+                        $this->client->lrem($this->generateGroupKey('finished'), 1, $taskId) : resolve(),
+                    ($reporter->isCompleted() || $reporter->isFailed()) ?
+                        $this->client->lpush($this->generateGroupKey('finished'), $taskId) : resolve(),
                 ]
             )
         );
@@ -231,7 +149,7 @@ class RedisTaskStorage implements TaskStorageInterface
                         $task->getId(),
                         serialize(ProgressReporter::generateWaitingReporter($task))
                     ),
-                    $this->client->sadd($this->generateGroupKey('unfinished'), $task->getId()),
+                    $this->client->lpush($this->generateGroupKey('unfinished'), $task->getId()),
                 ]
             )
         );
@@ -249,12 +167,9 @@ class RedisTaskStorage implements TaskStorageInterface
                         $task->getId(),
                         serialize(ProgressReporter::generateCancelledReporter($task))
                     ),
-
-                    $this->client->smove(
-                        $this->generateGroupKey('unfinished'),
-                        $this->generateGroupKey('finished'),
-                        $task->getId()
-                    ),
+                    $this->client->lrem($this->generateGroupKey('unfinished'), 1, $task->getId()),
+                    $this->client->lrem($this->generateGroupKey('finished'), 1, $task->getId()),
+                    $this->client->lpush($this->generateGroupKey('finished'), $task->getId()),
                 ]
             )
         );
@@ -264,8 +179,8 @@ class RedisTaskStorage implements TaskStorageInterface
     public function delete(string $taskId): PromiseInterface
     {
         $this->client->hdel($this->key, $taskId);
-        $this->client->srem($this->generateGroupKey('unfinished'), $taskId);
-        $this->client->srem($this->generateGroupKey('finished'), $taskId);
+        $this->client->lrem($this->generateGroupKey('unfinished'), 1, $taskId);
+        $this->client->lrem($this->generateGroupKey('finished'), 1, $taskId);
 
         return resolve();
     }
