@@ -79,7 +79,7 @@ class RedisTaskStorage implements TaskStorageInterface
 
         return $this->client->lrange($fromKey, $offset, $offset + $limit - 1)->then(
             function ($keys = null) {
-                if (is_array($keys)) {
+                if (is_array($keys) && [] != $keys) {
                     return call_user_func_array([$this->client, 'hmget'], array_merge([$this->key], $keys))->then(
                         function ($reporters = null) {
                             if (is_array($reporters)) {
