@@ -82,8 +82,10 @@ class Process extends EventEmitter implements ChildInterface
             return reject(['error' => 'Internal Error! Task cannot be decoded!']);
         }
 
+        $syncTask = true;
         if ($task instanceof LoopAwareInterface) {
             $task->setLoop($this->loop);
+            $syncTask = false;
         }
 
         if ($task instanceof MessengerAwareServiceTaskInterface) {
@@ -91,7 +93,12 @@ class Process extends EventEmitter implements ChildInterface
         }
 
         $progressReporter = new ProgressReporter($task);
-        $events           = ['done', 'failed', 'change'];
+        if ($syncTask) {
+            $events = ['done', 'failed'];
+        } else {
+            $events = ['done', 'failed', 'change'];
+        }
+
         Util::forwardEvents($progressReporter, $this, $events);
         foreach ($events as $event) {
             $progressReporter->on(

@@ -70,7 +70,7 @@ The tasks run method receives a progress reporter object that can be used to sen
 finalize the task. Generally, you always want to call `finishTask` at the end of your logic as calling this method will make the worker 
 as task completed for the manager. The exceptions thrown in the run method are caught and reported to manager with `failTask($error)`.
 If desired, progress information can be sent by calling `setMessage`, `setCompletionTarget`, `setCompletion` can be used to send progress 
-information. Calling these methods from a child informs manager and also manager informs task storage to update information if necessary.
+information, however this only works for Async Tasks. Calling these methods from a child informs manager and also manager informs task storage to update information if necessary.
  
 For more examples, check the integration tests in this library.
 
