@@ -6,6 +6,7 @@ use SunValley\TaskManager\ProgressReporter;
 use SunValley\TaskManager\Task\AbstractTask;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
+// Note this is a test to show that progress reporters are not working with SyncTasks
 class TestUpdatingSyncTask extends AbstractTask
 {
     
@@ -20,7 +21,7 @@ class TestUpdatingSyncTask extends AbstractTask
         for ($i=0; $i<10;$i++) {
             $progressReporter->setCompletion($i);
             $progressReporter->setMessage('completed '. $i);
-            sleep(2);
+            sleep(1);
         }
         $progressReporter->finishTask('done');
     }

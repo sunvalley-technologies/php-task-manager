@@ -48,7 +48,7 @@ class TestUpdatingTask extends AbstractAsyncTask
         if ($this->progress >= 10) {
             $this->defer->resolve('done');
         } else {
-            $this->loop->addTimer(2, \Closure::fromCallable([$this, 'progressTask']));
+            $this->loop->addTimer(1, \Closure::fromCallable([$this, 'progressTask']));
         }
     }
 }

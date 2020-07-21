@@ -47,7 +47,7 @@ class TaskManagerTest extends TestCase
         $loop    = LoopFactory::create();
         $storage = $this->generateRedisStorage($loop);
         $storage->clean();
-        $this->_testTaskManager($loop, new InMemoryTaskQueue($loop), $storage, $configuration);
+        $this->_testTaskManager($loop, new InMemoryTaskQueue($loop, $storage), $storage, $configuration);
     }
 
     public function _testTaskManager($loop, $queue, $storage, $configuration)
@@ -140,7 +140,7 @@ class TaskManagerTest extends TestCase
         $this->assertTrue(empty($failed[$task3->getId()]));
         $this->assertTrue(empty($failed[$task5->getId()]));
         $this->assertTrue($task5ProgressCalled);
-        $this->assertTrue($task6ProgressCalled);
+        $this->assertFalse($task6ProgressCalled);
 
         $taskManager->terminate();
         $loop->run();
