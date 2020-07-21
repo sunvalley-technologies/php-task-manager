@@ -62,9 +62,11 @@ an abstract class `\SunValley\TaskManager\Task\AbstractTask` that makes easier t
 Manager considers all tasks as synchronous by default unless a task implements `\SunValley\TaskManager\LoopAwareInterface`.
 This should be used carefully as async tasks are generally fire and forget and result of a task is only controlled by 
 passed ProgressReporter instance. This means that async tasks should also properly handle their errors. From managers 
-point of view, it is important to properly know that a task is sync or async as manager can push more sync tasks to a 
+point of view, it is important to properly know that a task is sync or async as manager can push more async tasks to a 
 worker that is already doing another async work. This is an important point to consider while building tasks. For this reason
-use the helper trait with your async tasks `\SunValley\TaskManager\Task\AsyncTaskTrait`.
+use the helper trait with your async tasks `\SunValley\TaskManager\Task\AsyncTaskTrait`. You should avoid using await or any other 
+promise waiting method on tasks body for the loop that is passed when LoopAwareInterface is defined on the task as the task's run method is
+started on the passed loop.
 
 The tasks run method receives a progress reporter object that can be used to send progress reports and also need to be used to 
 finalize the task. Generally, you always want to call `finishTask` at the end of your logic as calling this method will make the worker 
