@@ -16,6 +16,7 @@ use SunValley\TaskManager\TaskStorageInterface;
 use SunValley\TaskManager\Tests\Fixtures\Task\TestAsyncTask;
 use SunValley\TaskManager\Tests\Fixtures\Task\TestFailingTask;
 use SunValley\TaskManager\Tests\Fixtures\Task\TestMultiplyTask;
+use SunValley\TaskManager\Tests\Fixtures\Task\TestUpdatingSyncTask;
 use SunValley\TaskManager\Tests\Fixtures\Task\TestUpdatingTask;
 use function Clue\React\Block\await;
 use function React\Promise\all;
@@ -56,8 +57,8 @@ class TaskManagerTest extends TestCase
         $task2       = $this->buildAsyncTask();
         $task3       = $this->buildAsyncTask();
         $task4       = $this->buildFailingTask('error message');
-        /** @noinspection PhpUnhandledExceptionInspection */
-        $task5 = new TestUpdatingTask('updating-task');
+        $task5       = new TestUpdatingTask('updating-task');
+        $task6       = new TestUpdatingSyncTask('updating-sync-task');
 
         $caught          = [];
         $taskCompletedFn = function (TaskInterface $task) use (&$caught, $taskManager, $loop) {
@@ -81,6 +82,24 @@ class TaskManagerTest extends TestCase
         $taskCompletedFn($task2);
         $taskCompletedFn($task4);
         $taskCompletedFn($task5);
+        $taskCompletedFn($task6);
+
+        // Issue #8 check if task-progress- is getting called
+        $task5ProgressCalled = false;
+        $taskManager->on(
+            'task-progress-' . $task5->getId(),
+            function (ProgressReporter $reporter) use (&$task5ProgressCalled) {
+                $task5ProgressCalled = true;
+            }
+        );
+        $task6ProgressCalled = false;
+        $taskManager->on(
+            'task-progress-' . $task6->getId(),
+            function (ProgressReporter $reporter) use (&$task5ProgressCalled) {
+                $task6ProgressCalled = true;
+            }
+        );
+
         $taskFailedFn($task4);
 
         // push the task from queue
@@ -88,14 +107,15 @@ class TaskManagerTest extends TestCase
         $queue->enqueue($task2);
         $queue->enqueue($task4);
         $queue->enqueue($task5);
-        $this->assertEquals(4, $queue->info()[Stats::CURRENT_TASKS]);
+        $queue->enqueue($task6);
+        $this->assertEquals(5, $queue->info()[Stats::CURRENT_TASKS]);
         $taskManager->submitTask($task3)->then(
             function (ProgressReporter $reporter) use (&$caught, $loop) {
                 $caught[$reporter->getTask()->getId()] = $reporter->getResult();
             }
         );
 
-        $this->assertEquals(5, $queue->info()[Stats::CURRENT_TASKS]);
+        $this->assertEquals(6, $queue->info()[Stats::CURRENT_TASKS]);
 
         $loop->addPeriodicTimer(
             .6,
@@ -113,18 +133,21 @@ class TaskManagerTest extends TestCase
         $this->assertEquals($task2->getOptions()['return'], $caught[$task2->getId()]);
         $this->assertEquals($task3->getOptions()['return'], $caught[$task3->getId()]);
         $this->assertEquals('done', $caught[$task5->getId()]);
+        $this->assertEquals('done', $caught[$task6->getId()]);
         $this->assertContains($task4->getOptions()['error'], $failed[$task4->getId()]);
         $this->assertTrue(empty($failed[$task1->getId()]));
         $this->assertTrue(empty($failed[$task2->getId()]));
         $this->assertTrue(empty($failed[$task3->getId()]));
         $this->assertTrue(empty($failed[$task5->getId()]));
+        $this->assertTrue($task5ProgressCalled);
+        $this->assertTrue($task6ProgressCalled);
 
         $taskManager->terminate();
         $loop->run();
 
         $stats = $taskManager->stats();
         $this->assertEquals(0, $stats[Stats::_GROUP_QUEUE][Stats::CURRENT_TASKS]);
-        $this->assertEquals(4, $stats[Stats::_GROUP_POOL][Stats::COMPLETED_TASKS]);
+        $this->assertEquals(5, $stats[Stats::_GROUP_POOL][Stats::COMPLETED_TASKS]);
         $this->assertEquals(1, $stats[Stats::_GROUP_POOL][Stats::FAILED_TASKS]);
     }
 
