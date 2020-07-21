@@ -11,30 +11,53 @@ use SunValley\TaskManager\Stats;
 use SunValley\TaskManager\TaskInterface;
 use SunValley\TaskManager\TaskManager;
 use SunValley\TaskManager\TaskQueue\InMemoryTaskQueue;
+use SunValley\TaskManager\TaskStorage\RedisTaskStorage;
 use SunValley\TaskManager\TaskStorageInterface;
 use SunValley\TaskManager\Tests\Fixtures\Task\TestAsyncTask;
 use SunValley\TaskManager\Tests\Fixtures\Task\TestFailingTask;
 use SunValley\TaskManager\Tests\Fixtures\Task\TestMultiplyTask;
+use SunValley\TaskManager\Tests\Fixtures\Task\TestUpdatingTask;
+use function Clue\React\Block\await;
+use function React\Promise\all;
 
 class TaskManagerTest extends TestCase
 {
 
     public function testTaskManager()
     {
-        $loop          = LoopFactory::create();
-        $queue         = new InMemoryTaskQueue($loop);
         $configuration = new Configuration();
         $configuration->setMaxJobsPerProcess(2);
         $configuration->setMaxProcesses(3);
         $configuration->setTtl(1);
 
+        $loop    = LoopFactory::create();
         $storage = $this->createMock(TaskStorageInterface::class);
         $storage->expects($this->atLeastOnce())->method('update');
+        $this->_testTaskManager($loop, new InMemoryTaskQueue($loop), $storage, $configuration);
+    }
+
+    public function testTaskManagerRedisStorage()
+    {
+        $configuration = new Configuration();
+        $configuration->setMaxJobsPerProcess(2);
+        $configuration->setMaxProcesses(3);
+        $configuration->setTtl(1);
+
+        $loop    = LoopFactory::create();
+        $storage = $this->generateRedisStorage($loop);
+        $storage->clean();
+        $this->_testTaskManager($loop, new InMemoryTaskQueue($loop), $storage, $configuration);
+    }
+
+    public function _testTaskManager($loop, $queue, $storage, $configuration)
+    {
         $taskManager = new TaskManager($loop, $queue, $configuration, $storage);
         $task1       = $this->buildAsyncTask();
         $task2       = $this->buildAsyncTask();
         $task3       = $this->buildAsyncTask();
         $task4       = $this->buildFailingTask('error message');
+        /** @noinspection PhpUnhandledExceptionInspection */
+        $task5 = new TestUpdatingTask('updating-task');
 
         $caught          = [];
         $taskCompletedFn = function (TaskInterface $task) use (&$caught, $taskManager, $loop) {
@@ -57,20 +80,22 @@ class TaskManagerTest extends TestCase
         $taskCompletedFn($task1);
         $taskCompletedFn($task2);
         $taskCompletedFn($task4);
+        $taskCompletedFn($task5);
         $taskFailedFn($task4);
 
         // push the task from queue
         $queue->enqueue($task1);
         $queue->enqueue($task2);
         $queue->enqueue($task4);
-        $this->assertEquals(3, $queue->info()[Stats::CURRENT_TASKS]);
+        $queue->enqueue($task5);
+        $this->assertEquals(4, $queue->info()[Stats::CURRENT_TASKS]);
         $taskManager->submitTask($task3)->then(
             function (ProgressReporter $reporter) use (&$caught, $loop) {
                 $caught[$reporter->getTask()->getId()] = $reporter->getResult();
             }
         );
 
-        $this->assertEquals(4, $queue->info()[Stats::CURRENT_TASKS]);
+        $this->assertEquals(5, $queue->info()[Stats::CURRENT_TASKS]);
 
         $loop->addPeriodicTimer(
             .6,
@@ -87,17 +112,19 @@ class TaskManagerTest extends TestCase
         $this->assertEquals($task1->getOptions()['return'], $caught[$task1->getId()]);
         $this->assertEquals($task2->getOptions()['return'], $caught[$task2->getId()]);
         $this->assertEquals($task3->getOptions()['return'], $caught[$task3->getId()]);
+        $this->assertEquals('done', $caught[$task5->getId()]);
         $this->assertContains($task4->getOptions()['error'], $failed[$task4->getId()]);
         $this->assertTrue(empty($failed[$task1->getId()]));
         $this->assertTrue(empty($failed[$task2->getId()]));
         $this->assertTrue(empty($failed[$task3->getId()]));
+        $this->assertTrue(empty($failed[$task5->getId()]));
 
         $taskManager->terminate();
         $loop->run();
 
         $stats = $taskManager->stats();
         $this->assertEquals(0, $stats[Stats::_GROUP_QUEUE][Stats::CURRENT_TASKS]);
-        $this->assertEquals(3, $stats[Stats::_GROUP_POOL][Stats::COMPLETED_TASKS]);
+        $this->assertEquals(4, $stats[Stats::_GROUP_POOL][Stats::COMPLETED_TASKS]);
         $this->assertEquals(1, $stats[Stats::_GROUP_POOL][Stats::FAILED_TASKS]);
     }
 
@@ -124,5 +151,34 @@ class TaskManagerTest extends TestCase
     protected function buildAsyncTask()
     {
         return new TestAsyncTask(uniqid(), ['timer' => 0.5, 'return' => mt_rand()]);
+    }
+
+
+    protected function generateRedisStorage($loop)
+    {
+        $redisUri = $_SERVER['REDIS_URI'] ?? $_ENV['REDIS_URI'] ?? 'redis://localhost:6379';
+
+        return new class($loop, $redisUri) extends RedisTaskStorage {
+
+            public function getClient()
+            {
+                return $this->client;
+            }
+
+            public function clean()
+            {
+                await(
+                    all(
+                        [
+                            $this->client->del($this->key),
+                            $this->client->del($this->generateGroupKey('finished')),
+                            $this->client->del($this->generateGroupKey('unfinished')),
+                        ]
+                    ),
+                    $this->getLoop()
+                );
+
+            }
+        };
     }
 }
