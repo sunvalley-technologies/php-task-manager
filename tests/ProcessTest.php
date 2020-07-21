@@ -41,7 +41,7 @@ class ProcessTest extends TestCase
         $loop->run();
 
         $this->assertEquals($options['number1'] * $options['number2'], $foundResult);
-        $method->shouldHaveBeenCalledTimes(3);
+        $method->shouldHaveBeenCalledTimes(1);
     }
 
     public function testAsyncTaskProcess()
