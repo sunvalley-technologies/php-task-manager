@@ -17,6 +17,12 @@ matrix:
           env: DEPENDENCIES="symfony/options-resolver:^3"
         - php: 7.4
           env: DEPENDENCIES="symfony/options-resolver:^3"
+        - php: 7.2
+          env: DEPENDENCIES="symfony/options-resolver:^4"
+        - php: 7.3
+          env: DEPENDENCIES="symfony/options-resolver:^4"
+        - php: 7.4
+          env: DEPENDENCIES="symfony/options-resolver:^4"
 
 sudo: false
 
